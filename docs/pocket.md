@@ -119,8 +119,11 @@ JSON (`qubits: 5`), QASM (`qreg q[5]`), moments, and golf are untouched.
   the moment a tile lands on q3/q4 (real tiles are never hidden), contracting
   when removed (stabilizer keeps this non-flickery). `all` pins 5.
 - Implemented as a pure display transform (`{qubits: D, gates}` fed to the
-  controlled editor). The histogram needs nothing — it already reduces to
-  active qubits.
+  controlled editor).
+- **Histogram follows the displayed qubits** (per Jan): at D = 3, always show
+  all 8 basis states in basis order — zeros as dim stubs, fixed axis, so
+  probability visibly moves between columns. At D ≥ 4, the scale strategies
+  apply (zeros hidden, top-6 + tail, uniform pattern).
 
 ## Deployment
 
