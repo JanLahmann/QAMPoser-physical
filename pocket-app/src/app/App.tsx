@@ -488,11 +488,15 @@ export function App() {
         </a>
         <FullscreenButton variant="bar" />
         <SettingsControl />
-        {/* The idle-state CTA lives on the start card alone (a topbar twin
-            reads as two different actions); the topbar only offers Stop. */}
-        {running && (
+        {/* One switch, one position: the topbar button toggles Start ↔ Stop.
+            The start card below carries no button of its own. */}
+        {running ? (
           <button className="pk-btn is-stop" onClick={camera.stop}>
             Stop
+          </button>
+        ) : (
+          <button className="pk-btn" onClick={camera.start} disabled={camera.status === 'starting'}>
+            {camera.status === 'starting' ? 'Starting…' : 'Start camera'}
           </button>
         )}
       </header>
@@ -565,7 +569,7 @@ function CameraPanel({
   boardLocked: boolean;
   visible: boolean;
 }) {
-  const { status, error, fps, videoRef, start, zoom, zoomRange, previewScale, setZoom, stepZoom, resetZoom } =
+  const { status, error, fps, videoRef, zoom, zoomRange, previewScale, setZoom, stepZoom, resetZoom } =
     camera;
 
   // Pinch-to-zoom (two pointers) + double-tap-to-reset on the preview.
@@ -664,9 +668,6 @@ function CameraPanel({
                 ? error
                 : 'Start the camera, then frame the printed mat so all four corner markers are visible. Place tiles and watch the circuit build itself.'}
             </p>
-            <button className="pk-btn" onClick={start} disabled={status === 'starting'}>
-              {status === 'starting' ? 'Starting…' : 'Start camera'}
-            </button>
             <a className="pk-startcard-link" href="#guide">
               New here? Read the guide
             </a>
