@@ -41,6 +41,15 @@ import {
   type GolfState,
 } from './golf';
 import { friendlyWarning } from './warnings';
+import {
+  detectEnv,
+  exitFullscreen,
+  fullscreenElement,
+  loadHintDismissed,
+  requestFullscreen,
+  saveHintDismissed,
+  shouldShowInstallHint,
+} from './fullscreen';
 import { BOARD } from '../vision/geometry';
 import type { FrameResult } from '../vision/pipeline';
 import type { BuildWarning } from '../vision/circuitBuilder';
@@ -78,6 +87,88 @@ function StatePanel({ circuit }: { circuit: Circuit }) {
           columns <b>{columns}</b>
         </div>
       </div>
+    </div>
+  );
+}
+
+/** Element-Fullscreen state + toggle, feature-detected (hidden on iPhone). */
+function useFullscreen() {
+  const supported = useMemo(
+    () =>
+      typeof document !== 'undefined' &&
+      detectEnv(window as Window & typeof globalThis).hasElementFullscreen,
+    [],
+  );
+  const [active, setActive] = useState(false);
+  useEffect(() => {
+    if (!supported) return;
+    const sync = () => setActive(fullscreenElement(document) != null);
+    sync();
+    document.addEventListener('fullscreenchange', sync);
+    document.addEventListener('webkitfullscreenchange', sync);
+    return () => {
+      document.removeEventListener('fullscreenchange', sync);
+      document.removeEventListener('webkitfullscreenchange', sync);
+    };
+  }, [supported]);
+  const toggle = useCallback(() => {
+    if (fullscreenElement(document) != null) exitFullscreen(document);
+    else requestFullscreen(document.documentElement);
+  }, []);
+  return { supported, active, toggle };
+}
+
+function FullscreenButton({ variant }: { variant: 'bar' | 'cam' }) {
+  const { supported, active, toggle } = useFullscreen();
+  if (!supported) return null;
+  const label = active ? 'Exit fullscreen' : 'Fullscreen';
+  return (
+    <button
+      type="button"
+      className={`pk-fs pk-fs--${variant}`}
+      onClick={toggle}
+      aria-label={label}
+      title={label}
+    >
+      <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
+        {active ? (
+          <path
+            fill="currentColor"
+            d="M9 9V4H7v3H4v2h5Zm6 0h5V7h-3V4h-2v5ZM9 15H4v2h3v3h2v-5Zm6 0v5h2v-3h3v-2h-5Z"
+          />
+        ) : (
+          <path
+            fill="currentColor"
+            d="M4 9V4h5v2H6v3H4Zm11-5h5v5h-2V6h-3V4ZM6 15v3h3v2H4v-5h2Zm12 0h2v5h-5v-2h3v-3Z"
+          />
+        )}
+      </svg>
+      {variant === 'bar' && <span className="pk-fs-label">{active ? 'Exit' : 'Fullscreen'}</span>}
+    </button>
+  );
+}
+
+/** iPhone-only "Add to Home Screen" hint — shown once the camera has run. */
+function InstallHint({ cameraStarted }: { cameraStarted: boolean }) {
+  const env = useMemo(() => detectEnv(window as Window & typeof globalThis), []);
+  const [dismissed, setDismissed] = useState(() => loadHintDismissed(storage));
+  if (!shouldShowInstallHint(env, { cameraStarted, dismissed })) return null;
+  return (
+    <div className="pk-install-hint" role="note">
+      <span>
+        For fullscreen, add Entangible to your Home Screen: <b>Share → Add to Home Screen</b>.
+      </span>
+      <button
+        type="button"
+        className="pk-install-hint-x"
+        aria-label="Dismiss"
+        onClick={() => {
+          saveHintDismissed(storage);
+          setDismissed(true);
+        }}
+      >
+        ✕
+      </button>
     </div>
   );
 }
@@ -237,6 +328,13 @@ export function App() {
   const camera = useCamera({ onResult, lowPower: settings.lowpower });
   fpsRef.current = camera.fps;
 
+  // Latch "the camera has run once" — gates the iPhone install hint so it never
+  // clutters the very first impression.
+  const [cameraEverStarted, setCameraEverStarted] = useState(false);
+  useEffect(() => {
+    if (camera.status === 'starting' || camera.status === 'running') setCameraEverStarted(true);
+  }, [camera.status]);
+
   useEffect(() => {
     const id = window.setInterval(
       () => setHintIndex((i) => (i + 1) % HINTS.length),
@@ -311,17 +409,20 @@ export function App() {
     <div className="pk">
       <header className="pk-topbar">
         <div className="pk-brand">
-          <span className="en">En</span>tangible<small>pocket</small>
+          <span className="en">En</span>
+          <span className="pk-brand-rest">tangible</span>
+          <small>pocket</small>
         </div>
         {isGolf && <span className="pk-pill pk-pill--mode">golf</span>}
         <span className="pk-spacer" />
-        <span className={`pk-pill ${camPill.cls}`}>
+        <span className={`pk-pill ${camPill.cls}`} aria-label={camPill.label} title={camPill.label}>
           <span className="pk-dot" aria-hidden="true" />
-          {camPill.label}
+          <span className="pk-pill-label">{camPill.label}</span>
         </span>
         <a className="pk-help" href="#guide" aria-label="Guide and about" title="Guide & about">
           ?
         </a>
+        <FullscreenButton variant="bar" />
         <SettingsControl />
         {running ? (
           <button className="pk-btn is-stop" onClick={camera.stop}>
@@ -337,6 +438,16 @@ export function App() {
       <ThemeProvider defaultTheme="dark">
         <QamposerProvider circuit={circuit} config={qamposerConfig}>
           <main className={`pk-main ${settings.side === 'left' ? 'pk-side-left' : ''}`}>
+            {/* Phone-only amber toast (footer hint ticker is hidden on phones);
+                CSS reveals it only under the phone breakpoints. */}
+            {warnings.length > 0 && (
+              <div className="pk-toast" role="status">
+                <span className="pk-warnicon" aria-hidden="true">
+                  ⚠
+                </span>
+                <span>{warnings.map((w) => friendlyWarning(w)).join('  ·  ')}</span>
+              </div>
+            )}
             <section className="pk-stage">
               <div className="pk-stage-editor">
                 <CircuitEditor />
@@ -361,6 +472,8 @@ export function App() {
           <div key={hintIndex}>{HINTS[hintIndex]}</div>
         )}
       </footer>
+
+      <InstallHint cameraStarted={cameraEverStarted} />
 
       <Celebrations
         celebration={celebration}
@@ -460,6 +573,7 @@ function CameraPanel({
         >
           <video ref={videoRef} playsInline muted style={{ transform: `scale(${previewScale})` }} />
           <canvas ref={overlayRef} className="pk-overlay" />
+          <FullscreenButton variant="cam" />
           <span className="pk-cam-fps">{fps} fps</span>
           <ZoomPill
             zoom={zoom}

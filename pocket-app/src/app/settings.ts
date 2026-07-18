@@ -35,6 +35,26 @@ export const DEFAULT_SETTINGS: Settings = {
   debug: false,
 };
 
+/**
+ * Panels a brand-new *phone* visitor sees before touching settings: camera +
+ * results only (state / qasm off — no room on a handset). Applied ONLY as the
+ * initial default when nothing is persisted yet (design: phone-first). A stored
+ * preference — or a URL override — always wins over this.
+ */
+export const PHONE_DEFAULT_PANELS: readonly PanelId[] = ['camera', 'results'];
+
+/**
+ * matchMedia query that means "phone": a narrow (<700px) viewport *or* a short
+ * landscape phone (a landscape handset is wider than 700px but under 450px
+ * tall). Kept in sync with the phone CSS breakpoints in pocket.css.
+ */
+export const PHONE_MEDIA_QUERY = '(max-width: 699px), (max-height: 450px)';
+
+/** Initial, never-yet-persisted settings — phone-aware panel default. */
+export function initialDefaults(isPhone: boolean): Settings {
+  return isPhone ? { ...DEFAULT_SETTINGS, panels: [...PHONE_DEFAULT_PANELS] } : DEFAULT_SETTINGS;
+}
+
 export const STORAGE_KEY = 'entangible.pocket.settings';
 
 // --- pure helpers -----------------------------------------------------------
@@ -120,10 +140,12 @@ export interface SettingsStore {
 interface StoreDeps {
   storage?: Pick<Storage, 'getItem' | 'setItem'> | null;
   search?: string;
+  /** When true and nothing is persisted yet, seed the phone panel default. */
+  isPhone?: boolean;
 }
 
-export function createSettingsStore({ storage, search = '' }: StoreDeps = {}): SettingsStore {
-  let persisted: Settings = DEFAULT_SETTINGS;
+export function createSettingsStore({ storage, search = '', isPhone = false }: StoreDeps = {}): SettingsStore {
+  let persisted: Settings = initialDefaults(isPhone);
   if (storage) {
     try {
       const raw = storage.getItem(STORAGE_KEY);
@@ -183,9 +205,12 @@ export function createSettingsStore({ storage, search = '' }: StoreDeps = {}): S
 
 function browserStore(): SettingsStore {
   if (typeof window === 'undefined') return createSettingsStore();
+  const isPhone =
+    typeof window.matchMedia === 'function' && window.matchMedia(PHONE_MEDIA_QUERY).matches;
   return createSettingsStore({
     storage: window.localStorage,
     search: window.location.search,
+    isPhone,
   });
 }
 

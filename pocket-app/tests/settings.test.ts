@@ -3,7 +3,9 @@ import {
   parseUrlOverrides,
   sanitize,
   createSettingsStore,
+  initialDefaults,
   DEFAULT_SETTINGS,
+  PHONE_DEFAULT_PANELS,
   STORAGE_KEY,
 } from '../src/app/settings';
 
@@ -112,5 +114,48 @@ describe('createSettingsStore', () => {
     expect(store.get().mode).toBe('golf'); // still overridden
     expect(store.get().side).toBe('left');
     expect(store.get().debug).toBe(true);
+  });
+});
+
+describe('initialDefaults (phone-aware panel default)', () => {
+  it('returns the desktop defaults when not a phone', () => {
+    expect(initialDefaults(false)).toEqual(DEFAULT_SETTINGS);
+  });
+
+  it('drops state/qasm to camera+results on a phone', () => {
+    expect(initialDefaults(true).panels).toEqual([...PHONE_DEFAULT_PANELS]);
+    expect(PHONE_DEFAULT_PANELS).toEqual(['camera', 'results']);
+    // Only the panels field differs from the desktop default.
+    expect(initialDefaults(true)).toEqual({ ...DEFAULT_SETTINGS, panels: [...PHONE_DEFAULT_PANELS] });
+  });
+});
+
+describe('phone-default panels vs persistence', () => {
+  it('seeds camera+results for a pristine phone (no storage value yet)', () => {
+    const storage = fakeStorage();
+    const store = createSettingsStore({ storage, isPhone: true });
+    expect(store.get().panels).toEqual(['camera', 'results']);
+  });
+
+  it('keeps the full desktop default for a pristine non-phone', () => {
+    const store = createSettingsStore({ storage: fakeStorage(), isPhone: false });
+    expect(store.get().panels).toEqual([...DEFAULT_SETTINGS.panels]);
+  });
+
+  it('a persisted choice always wins over the phone default', () => {
+    const storage = fakeStorage({
+      [STORAGE_KEY]: JSON.stringify({ panels: ['camera', 'results', 'state', 'qasm'] }),
+    });
+    const store = createSettingsStore({ storage, isPhone: true });
+    expect(store.get().panels).toEqual(['camera', 'results', 'state', 'qasm']);
+  });
+
+  it('a URL override still wins over the phone default', () => {
+    const store = createSettingsStore({
+      storage: fakeStorage(),
+      isPhone: true,
+      search: '?panels=qasm',
+    });
+    expect(store.get().panels).toEqual(['qasm']);
   });
 });
