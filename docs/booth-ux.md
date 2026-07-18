@@ -144,6 +144,31 @@ Compare against canonical states up to global phase, fidelity ≥ 0.99.
   observed live).
 - Strip messages: min 4 s on screen, drop intermediate messages if they queue.
 
+> **DECIDED 2026-07-18: Variant A (stage & sidebar) is the booth layout**, with
+> the refinements below. Golf mode may adopt cinema-style chrome later.
+
+## Variant-A refinements (Jan, 2026-07-18)
+
+- **Vertical bit-stack labels**: histogram outcome labels render their bits
+  stacked vertically, top bit = q0 — mirroring the wire order on the stage.
+  A small `q0…q4` guide column sits left of the labels. ≤8 outcomes: full
+  stacks per row. More: sorted top rows with stacks + aggregated tail;
+  uniform superposition: pattern block + "2^k equally likely" callout.
+- **Touch (optional, config `--touch` / auto via `pointer: coarse`)**: touch
+  never edits the circuit (the table is the editor). Touch = *inspect*: tap a
+  gate → one-sentence info popover ("H puts q0 in superposition"); tap an
+  outcome row → what that basis state means; tap the sphere in golf → replay
+  the trajectory. Popovers auto-dismiss (6 s); attract-mode exits on touch too.
+- **Golf-mode layout**: sidebar widens (22% → ~30%). Below the scorecard, a
+  **mini recognized-circuit panel** (compact wires + gates) — visitors must
+  always see what the camera read, in every mode.
+- **Golf-mode animation** (builds on the layer-evolution idea in design.md):
+  the target node carries the flag and *pulses* (2 s cycle); on every stable
+  circuit change the ball replays from |0…0⟩ **gate-layer by gate-layer**
+  (~600 ms per layer, physically-correct rotation arcs, fading purple trail);
+  a subtle glow scales with fidelity as the ball nears the flag; fidelity
+  ≥ 0.99 → hole-in celebration.
+
 ## Scaling, modes, branding, help (v2 additions, 2026-07-18)
 
 **RESULTS at high qubit counts** — the sidebar histogram is **vertical**
