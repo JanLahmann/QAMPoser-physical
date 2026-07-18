@@ -90,6 +90,34 @@ Every message is a JSON object with a `type` discriminator.
   answers with a fresh `status`.
 - Unknown/malformed client messages are logged and ignored — never fatal.
 
+### `layout` — panel/mode state (additive, booth-v2)
+
+```jsonc
+{
+  "type": "layout",
+  "mode": "composer",                    // "composer" | "golf" | "attract"
+  "sidebar": "right",                    // "right" | "left"
+  "panels": ["results", "state", "qasm"] // visible panels, in order (registry names)
+}
+```
+
+Broadcast on change; latest replayed to new clients after `status`. Panel
+registry (booth-v2): `results`, `state`, `qasm`, `qsphere` (post-upstream),
+`scorecard` + `minicircuit` (golf), `branding`. Unknown names are ignored by
+clients (forward-compatible).
+
+### Client → server (additive, booth-v2)
+
+```jsonc
+{ "type": "select_mode",   "mode": "golf" }
+{ "type": "select_layout", "sidebar": "left", "panels": ["results", "qasm"] }
+// partial select_layout allowed — omitted fields keep their current value
+```
+
+Both persist to `layout.toml` and trigger a `layout` broadcast. REST siblings:
+`GET /api/layout` (current layout JSON), `GET /api/branding`
+(`{name, logoUrl|null, qrTarget}` from `branding.toml`, defaults when absent).
+
 ## `/ws/frames` — phone capture (M4; server side lands in M2)
 
 - Binary messages: JPEG-encoded frames, most-recent-wins (the server keeps a
