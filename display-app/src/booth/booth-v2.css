@@ -1,0 +1,377 @@
+/*
+ * Entangible booth — v2 exhibit design system (variant A).
+ * Spec: docs/booth-ux.md. Layered surfaces, hairline borders, purple reserved
+ * for entanglement. Sizes are authored for 1080p and expressed in vh
+ * (1px @1080p = 0.0926vh) so 4K scales; loaded after styles.css so its
+ * overrides of M3 overlay classes win the cascade.
+ */
+
+.bo {
+  --bg: #0f1117;
+  --bg-panel: #161a22;
+  --bg-inset: #11141b;
+  --border: #262b36;
+  --text: #e6e9ef;
+  --muted: #8a91a0;
+  --faint: #5c6370;
+  --accent: #0f62fe;
+  --bars: #33b1ff;
+  --entangle: #7a5cff;
+  --ok: #2fbf71;
+  --warn: #f1c21b;
+
+  position: fixed;
+  inset: 0;
+  display: grid;
+  grid-template-rows: 5.2vh 1fr 4.1vh;
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'IBM Plex Sans', -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif;
+  overflow: hidden;
+}
+
+.bo .mono,
+.bo-qasm,
+.bo-h-stack,
+.bo-h-guide {
+  font-family: 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+/* ---- topbar ---------------------------------------------------------- */
+
+.bo-topbar {
+  display: flex;
+  align-items: center;
+  gap: 1.4vh;
+  padding: 0 1.6vh;
+  background: var(--bg-panel);
+  border-bottom: 1px solid var(--border);
+  min-width: 0;
+}
+
+.bo-brand {
+  font-size: 2.8vh;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+
+.bo-brand .en {
+  color: var(--entangle);
+}
+
+.bo-spacer {
+  flex: 1;
+}
+
+.bo-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.8vh;
+  font-size: 1.5vh;
+  color: var(--muted);
+  background: var(--bg-inset);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 0.7vh 1.5vh;
+  white-space: nowrap;
+}
+
+.bo-dot {
+  width: 1vh;
+  height: 1vh;
+  border-radius: 50%;
+  background: var(--ok);
+}
+
+.bo-pill.is-pending .bo-dot {
+  background: var(--warn);
+  animation: bo-pulse 1.2s ease-in-out infinite;
+}
+
+.bo-pill.is-down .bo-dot {
+  background: #e5484d;
+}
+
+.bo-pill.is-camera .bo-dot {
+  background: var(--accent);
+}
+
+@keyframes bo-pulse {
+  50% { opacity: 0.35; }
+}
+
+.bo-evbrand {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  line-height: 1.3;
+  padding-left: 1.4vh;
+  border-left: 1px solid var(--border);
+}
+
+.bo-evbrand .bo-ev-eyebrow {
+  font-size: 1.1vh;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--faint);
+}
+
+.bo-evbrand .bo-ev-name {
+  font-size: 1.6vh;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.bo-evbrand img {
+  max-height: 3vh;
+  max-width: 18vh;
+}
+
+/* ---- main: stage + sidebar ------------------------------------------- */
+
+.bo-main {
+  display: grid;
+  grid-template-columns: 1fr 21.5%;
+  min-height: 0;
+}
+
+.bo-stage {
+  position: relative;
+  min-width: 0;
+  min-height: 0;
+  padding: 2.4vh 1.8vh;
+  display: flex;
+}
+
+.bo-stage > .bo-stage-editor {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  display: flex;
+}
+
+.bo-stage-editor > :first-child {
+  flex: 1;
+  min-height: 0;
+}
+
+.bo-side {
+  background: var(--bg-panel);
+  border-left: 1px solid var(--border);
+  padding: 1.9vh 1.6vh;
+  display: flex;
+  flex-direction: column;
+  gap: 1.7vh;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.bo-label {
+  font-size: 1.4vh;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.bo-well {
+  background: var(--bg-inset);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 1.3vh;
+}
+
+/* ---- RESULTS: vertical histogram — outcome rows, horizontal bars,
+        vertical bit-stack labels (top bit = q0) ------------------------- */
+
+.bo-h-plot {
+  display: flex;
+  flex-direction: column;
+  gap: 1vh;
+}
+
+.bo-h-plot.is-micro {
+  gap: 0.28vh;
+}
+
+.bo-h-row {
+  display: flex;
+  align-items: center;
+  gap: 1vh;
+}
+
+.bo-h-guide {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  line-height: 1.4;
+  font-size: 1.1vh;
+  color: var(--faint);
+  width: 2.6vh;
+  flex: none;
+}
+
+.bo-h-stack {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  line-height: 1.4;
+  font-size: 1.35vh;
+  color: var(--muted);
+  width: 1.6vh;
+  flex: none;
+}
+
+.bo-h-track {
+  flex: 1;
+  align-self: stretch;
+  display: flex;
+  align-items: center;
+  background: var(--bg);
+  border-radius: 3px;
+  overflow: hidden;
+  min-height: 1.6vh;
+}
+
+.bo-h-fill {
+  height: 62%;
+  min-height: 1.4vh;
+  background: var(--bars);
+  border-radius: 0 3px 3px 0;
+  transition: width 0.3s ease;
+}
+
+.bo-h-fill.is-dim {
+  background: #1c3f57;
+}
+
+.is-micro .bo-h-track {
+  min-height: 0.55vh;
+}
+
+.is-micro .bo-h-fill {
+  height: 100%;
+  min-height: 0.45vh;
+  background: #1c6ea0;
+}
+
+.bo-h-pct {
+  font-size: 1.25vh;
+  color: var(--muted);
+  width: 3.4vh;
+  flex: none;
+  text-align: right;
+}
+
+.bo-h-tail,
+.bo-h-note {
+  font-size: 1.25vh;
+  color: var(--faint);
+  margin-top: 0.7vh;
+}
+
+.bo-h-empty {
+  font-size: 1.5vh;
+  color: var(--faint);
+  padding: 2.5vh 0;
+  text-align: center;
+}
+
+/* ---- STATE stat rows -------------------------------------------------- */
+
+.bo-stats {
+  display: flex;
+  flex-direction: column;
+}
+
+.bo-stat {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  font-size: 1.65vh;
+  color: var(--muted);
+  padding: 0.6vh 0;
+  border-bottom: 1px solid #1c212c;
+}
+
+.bo-stat b {
+  color: var(--text);
+  font-weight: 500;
+  font-family: 'IBM Plex Mono', ui-monospace, Menlo, monospace;
+}
+
+/* ---- OPENQASM pane ---------------------------------------------------- */
+
+.bo-qasm {
+  font-size: 1.55vh;
+  line-height: 1.85;
+  color: var(--muted);
+  overflow: hidden;
+  white-space: pre;
+}
+
+.bo-qasm .kw {
+  color: var(--bars);
+}
+
+/* ---- footer: hint ticker / warnings ----------------------------------- */
+
+.bo-footer {
+  display: flex;
+  align-items: center;
+  gap: 2vh;
+  padding: 0 1.8vh;
+  background: var(--bg-panel);
+  border-top: 1px solid var(--border);
+  font-size: 1.7vh;
+  color: var(--muted);
+  min-width: 0;
+}
+
+.bo-footer.has-warnings {
+  color: var(--warn);
+}
+
+.bo-footer .bo-warnicon {
+  flex: none;
+}
+
+.bo-footer > div {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ---- overrides of M3 overlay pieces (loaded after styles.css) --------- */
+
+/* Message strip becomes a stage overlay pill, bottom-left. */
+.bo .ent-strip {
+  position: absolute;
+  left: 2.4vh;
+  bottom: 2.4vh;
+  right: auto;
+  max-width: 72%;
+  background: rgba(22, 26, 34, 0.94);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 1vh 2.2vh;
+  font-size: 1.85vh;
+  color: var(--text);
+  z-index: 4;
+}
+
+/* Entanglement is purple across the system — Bell banner included. */
+.ent-banner--bell {
+  color: #7a5cff;
+  text-shadow: 0 0 4vh rgba(122, 92, 255, 0.4);
+}
+
+/* Noisy-Run is the booth's single primary action (IBM "Set up and run"). */
+.bo .ent-noisy__btn {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+  font-weight: 600;
+}

@@ -1,55 +1,157 @@
 /**
- * Ideal probability histogram, computed locally from the 5-qubit statevector.
+ * RESULTS panel — vertical histogram with vertical bit-stack labels (booth v2).
  *
- * The spec's layout puts the circuit on the left (~62 %) and the histogram on
- * the right (~38 %). The composer's own results panel (`ResultsPanel`) lives in
- * a separate bundle with its own React context, so it can't share the booth's
- * `QamposerProvider`; rather than fight the packaging we render our own bars in
- * Carbon blue from the exact statevector — instant, dependency-free, and always
- * in sync with the moment engine.
+ * Outcomes stack vertically as rows and bars grow horizontally; each row's
+ * label is its bit-string written vertically, top bit = q0 — mirroring the
+ * wire order on the stage. A faint `q0…` guide sits beside the FIRST row only
+ * (one-time legend; every row shares the layout). Per docs/booth-ux.md
+ * (variant-A refinements, confirmed row-form):
+ *   k = 0  → empty hint
+ *   k ≤ 3  → all 2^k outcomes as rows
+ *   k > 3  → uniform: label-less micro-row pattern + callout;
+ *            otherwise sorted top-6 rows + aggregated-tail note.
+ * Probabilities come from the local statevector (ideal), reduced onto the
+ * active qubits — inactive qubits are |0⟩ and marginalize away exactly.
  */
 import { useMemo } from 'react';
 import type { Circuit } from '@qamposer/react';
-import { DIM, NUM_QUBITS, statevector } from '../quantum/statevector';
+import { activeQubits, DIM, NUM_QUBITS, statevector } from '../quantum/statevector';
 
-const CARBON_BLUE = '#0f62fe';
-const MIN_PROB = 0.001;
+const TOP_N = 6;
+const UNIFORM_EPS = 0.004;
 
-interface Bar {
-  state: string;
+interface Outcome {
+  bits: string; // one char per active qubit, top(=first active) first
   prob: number;
 }
 
-export function Histogram({ circuit }: { circuit: Circuit }) {
-  const bars = useMemo<Bar[]>(() => {
-    const sv = statevector(circuit);
-    const out: Bar[] = [];
-    for (let i = 0; i < DIM; i++) {
-      const p = sv[i].re * sv[i].re + sv[i].im * sv[i].im;
-      if (p > MIN_PROB) out.push({ state: i.toString(2).padStart(NUM_QUBITS, '0'), prob: p });
+function reducedOutcomes(circuit: Circuit, active: number[]): Outcome[] {
+  const sv = statevector(circuit);
+  const k = active.length;
+  const probs = new Array<number>(1 << k).fill(0);
+  for (let i = 0; i < DIM; i++) {
+    const p = sv[i].re * sv[i].re + sv[i].im * sv[i].im;
+    if (p === 0) continue;
+    let idx = 0;
+    for (let b = 0; b < k; b++) {
+      idx = (idx << 1) | ((i >> (NUM_QUBITS - 1 - active[b])) & 1);
     }
-    return out;
-  }, [circuit]);
+    probs[idx] += p;
+  }
+  return probs.map((prob, idx) => ({
+    bits: idx.toString(2).padStart(k, '0'),
+    prob,
+  }));
+}
 
-  const max = bars.reduce((m, b) => Math.max(m, b.prob), 0) || 1;
-  const empty = circuit.gates.length === 0;
+function BitStack({ bits }: { bits: string }) {
+  return (
+    <span className="bo-h-stack" aria-label={bits}>
+      {bits.split('').map((b, i) => (
+        <span key={i}>{b}</span>
+      ))}
+    </span>
+  );
+}
+
+/** One-time legend: q-labels beside the first row's stack; spacer elsewhere. */
+function Guide({ active, first }: { active: number[]; first: boolean }) {
+  return (
+    <span className="bo-h-guide" aria-hidden="true">
+      {first ? active.map((q) => <span key={q}>q{q}</span>) : null}
+    </span>
+  );
+}
+
+export function Histogram({ circuit }: { circuit: Circuit }) {
+  const active = useMemo(() => activeQubits(circuit), [circuit]);
+  const outcomes = useMemo(
+    () => (active.length === 0 ? [] : reducedOutcomes(circuit, active)),
+    [circuit, active],
+  );
+
+  if (active.length === 0) {
+    return (
+      <div>
+        <div className="bo-label">Results</div>
+        <div className="bo-well">
+          <div className="bo-h-empty">Place a tile to see outcomes</div>
+        </div>
+      </div>
+    );
+  }
+
+  const k = active.length;
+  const count = outcomes.length;
+  const max = outcomes.reduce((m, o) => Math.max(m, o.prob), 0) || 1;
+
+  // Uniform superposition: a featured state, not a failed chart.
+  const isUniform =
+    k > 3 && outcomes.every((o) => Math.abs(o.prob - 1 / count) < UNIFORM_EPS);
+
+  if (isUniform) {
+    return (
+      <div>
+        <div className="bo-label">Results · {count} outcomes</div>
+        <div className="bo-well">
+          <div className="bo-h-plot is-micro">
+            {outcomes.map((o) => (
+              <div className="bo-h-row" key={o.bits}>
+                <span className="bo-h-track">
+                  <span className="bo-h-fill" style={{ width: '58%' }} />
+                </span>
+              </div>
+            ))}
+          </div>
+          <div className="bo-h-note">
+            all outcomes ≈ {(100 / count).toFixed(1)}% — {count} equally likely
+            possibilities
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  let shown = outcomes;
+  let tail: Outcome[] = [];
+  if (k > 3) {
+    const sorted = [...outcomes].sort((a, b) => b.prob - a.prob);
+    shown = sorted.slice(0, TOP_N);
+    tail = sorted.slice(TOP_N).filter((o) => o.prob > 0.0005);
+  }
 
   return (
-    <div className="ent-histo">
-      <div className="ent-histo__title">Probabilities</div>
-      <div className="ent-histo__plot" data-count={bars.length}>
-        {bars.map((b) => (
-          <div className="ent-histo__col" key={b.state} title={`${b.state}: ${(b.prob * 100).toFixed(1)}%`}>
-            <div className="ent-histo__bar-wrap">
-              <div
-                className="ent-histo__bar"
-                style={{ height: `${(b.prob / max) * 100}%`, background: CARBON_BLUE }}
-              />
+    <div>
+      <div className="bo-label">
+        {k > 3 ? `Results · top ${shown.length} of ${count}` : 'Results · active qubits'}
+      </div>
+      <div className="bo-well">
+        <div className="bo-h-plot">
+          {shown.map((o, i) => (
+            <div
+              className="bo-h-row"
+              key={o.bits}
+              title={`${o.bits}: ${(o.prob * 100).toFixed(1)}%`}
+            >
+              <Guide active={active} first={i === 0} />
+              <BitStack bits={o.bits} />
+              <span className="bo-h-track">
+                <span
+                  className={`bo-h-fill ${o.prob < 0.004 ? 'is-dim' : ''}`}
+                  style={{ width: `${Math.max((o.prob / max) * 100, 1)}%` }}
+                />
+              </span>
+              <span className="bo-h-pct">
+                {o.prob >= 0.05 ? `${Math.round(o.prob * 100)}%` : ''}
+              </span>
             </div>
-            <div className="ent-histo__label">{b.state}</div>
+          ))}
+        </div>
+        {tail.length > 0 && (
+          <div className="bo-h-tail">
+            + {tail.length} more outcomes ≤ {(tail[0].prob * 100).toFixed(1)}% each
           </div>
-        ))}
-        {empty && <div className="ent-histo__hint">Place a tile to see outcomes</div>}
+        )}
       </div>
     </div>
   );
