@@ -1,38 +1,54 @@
 /**
- * RESULTS panel — column bars with vertical bit-stack labels, zero states
- * hidden. The chart logic is ported verbatim from the booth's
- * `display-app/src/booth/Histogram.tsx` (final form per docs/booth-ux.md); only
- * the class names differ (`pk-` prefix) so Pocket keeps its own stylesheet.
- * Probabilities come from the shared local statevector (imported, not copied).
+ * RESULTS panel — column bars with vertical bit-stack labels.
+ *
+ * The outcome space is the DISPLAYED qubit count `D` (rows 0..D-1), not the
+ * active subset (docs/pocket.md, "Qubit count"). The recognized circuit is
+ * always five physical qubits; the display transform guarantees no gate touches
+ * a row >= D, so marginalizing the remaining |0⟩ rows is exact. Bit order:
+ * leftmost stack bit = q0 (top wire).
+ *
+ *   - D = 3 (compact default): a FIXED 8-column axis, basis order 000..111,
+ *     zero-probability columns kept as dim stubs (never hidden) so visitors
+ *     watch probability move between fixed columns as tiles change.
+ *   - D = 4 / 5: the booth strategy — zero states hidden, > 8 nonzero → sorted
+ *     top-6 + tail, a uniform spread → the compact micro pattern.
+ *
+ * The chart logic is ported from the booth's `display-app/src/booth/Histogram`;
+ * only the class names differ (`pk-` prefix). Probabilities come from the shared
+ * local statevector (imported, not copied).
  */
 import { useMemo } from 'react';
 import type { Circuit } from '@qamposer/react';
-import { activeQubits, DIM, NUM_QUBITS, statevector } from '@quantum/statevector';
+import { activeQubits, statevector } from '@quantum/statevector';
 
 const TOP_N = 6;
 const ZERO_EPS = 0.001;
 const UNIFORM_EPS = 0.004;
 const MAX_PLAIN = 8;
 
-interface Outcome {
+export interface Outcome {
   bits: string;
   prob: number;
 }
 
-function reducedOutcomes(circuit: Circuit, active: number[]): Outcome[] {
+/**
+ * Probabilities over the `displayQubits` displayed rows (0..D-1), in basis
+ * order 000..111. Pure — the single source of truth for the panel and its
+ * tests. Leftmost bit of `bits` is q0 (the top wire).
+ */
+export function displayOutcomes(circuit: Circuit, displayQubits: number): Outcome[] {
+  const D = displayQubits;
   const sv = statevector(circuit);
-  const k = active.length;
-  const probs = new Array<number>(1 << k).fill(0);
-  for (let i = 0; i < DIM; i++) {
+  const probs = new Array<number>(1 << D).fill(0);
+  for (let i = 0; i < sv.length; i++) {
     const p = sv[i].re * sv[i].re + sv[i].im * sv[i].im;
     if (p === 0) continue;
     let idx = 0;
-    for (let b = 0; b < k; b++) {
-      idx = (idx << 1) | ((i >> (NUM_QUBITS - 1 - active[b])) & 1);
-    }
+    // r = 0 (q0) contributes the most-significant bit → top wire on the left.
+    for (let r = 0; r < D; r++) idx = (idx << 1) | ((i >> r) & 1);
     probs[idx] += p;
   }
-  return probs.map((prob, idx) => ({ bits: idx.toString(2).padStart(k, '0'), prob }));
+  return probs.map((prob, idx) => ({ bits: idx.toString(2).padStart(D, '0'), prob }));
 }
 
 function BitStack({ bits }: { bits: string }) {
@@ -45,23 +61,63 @@ function BitStack({ bits }: { bits: string }) {
   );
 }
 
-function Guide({ active }: { active: number[] }) {
+function Guide({ rows }: { rows: number[] }) {
   return (
     <span className="pk-h-guide" aria-hidden="true">
-      {active.map((q) => (
+      {rows.map((q) => (
         <span key={q}>q{q}</span>
       ))}
     </span>
   );
 }
 
-export function ResultsHistogram({ circuit }: { circuit: Circuit }) {
-  const active = useMemo(() => activeQubits(circuit), [circuit]);
-  const outcomes = useMemo(
-    () => (active.length === 0 ? [] : reducedOutcomes(circuit, active)),
-    [circuit, active],
-  );
+export function ResultsHistogram({
+  circuit,
+  displayQubits,
+}: {
+  circuit: Circuit;
+  displayQubits: number;
+}) {
+  const D = displayQubits;
+  const outcomes = useMemo(() => displayOutcomes(circuit, D), [circuit, D]);
+  const rows = useMemo(() => Array.from({ length: D }, (_, r) => r), [D]);
 
+  // D = 3: fixed 8-column axis; zero columns are dim stubs, never hidden.
+  if (D === 3) {
+    const max = outcomes.reduce((m, o) => Math.max(m, o.prob), 0) || 1;
+    return (
+      <div>
+        <div className="pk-label">Results · 8 outcomes</div>
+        <div className="pk-well">
+          <div className="pk-h-plot">
+            <Guide rows={rows} />
+            {outcomes.map((o) => {
+              const dim = o.prob <= ZERO_EPS;
+              return (
+                <div
+                  className={`pk-h-col ${dim ? 'is-dim' : ''}`}
+                  key={o.bits}
+                  title={`${o.bits}: ${(o.prob * 100).toFixed(1)}%`}
+                >
+                  <span className="pk-h-pct">
+                    {o.prob >= 0.05 ? `${Math.round(o.prob * 100)}%` : ''}
+                  </span>
+                  <div
+                    className="pk-h-bar"
+                    style={{ height: dim ? '2px' : `${(o.prob / max) * 72}%` }}
+                  />
+                  <BitStack bits={o.bits} />
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // D >= 4: booth strategy over the D-qubit outcome list.
+  const active = activeQubits(circuit);
   if (active.length === 0) {
     return (
       <div>
@@ -119,7 +175,7 @@ export function ResultsHistogram({ circuit }: { circuit: Circuit }) {
       </div>
       <div className="pk-well">
         <div className="pk-h-plot">
-          <Guide active={active} />
+          <Guide rows={rows} />
           {shown.map((o) => (
             <div
               className="pk-h-col"

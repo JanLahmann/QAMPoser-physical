@@ -53,7 +53,42 @@ describe('sanitize', () => {
       side: 'left',
       lowpower: false,
       debug: true,
+      wires: 'compact',
     });
+  });
+
+  it('defaults wires to compact and only accepts "all" to override it', () => {
+    expect(sanitize({}).wires).toBe('compact');
+    expect(sanitize({ wires: 'bogus' }).wires).toBe('compact');
+    expect(sanitize({ wires: 'all' }).wires).toBe('all');
+  });
+});
+
+describe('wires setting', () => {
+  it('parses ?wires=all / ?wires=compact and ignores junk', () => {
+    expect(parseUrlOverrides('?wires=all')).toEqual({ wires: 'all' });
+    expect(parseUrlOverrides('?wires=compact')).toEqual({ wires: 'compact' });
+    expect(parseUrlOverrides('?wires=seven')).toEqual({});
+  });
+
+  it('defaults to compact with no storage and no url', () => {
+    expect(createSettingsStore().get().wires).toBe('compact');
+  });
+
+  it('URL ?wires=all overrides stored compact for the session', () => {
+    const storage = fakeStorage({ [STORAGE_KEY]: JSON.stringify({ wires: 'compact' }) });
+    const store = createSettingsStore({ storage, search: '?wires=all' });
+    expect(store.get().wires).toBe('all');
+  });
+
+  it('persists a UI change and a persisted choice wins on reload', () => {
+    const storage = fakeStorage();
+    const store = createSettingsStore({ storage });
+    store.update({ wires: 'all' });
+    expect(store.get().wires).toBe('all');
+    expect(JSON.parse(storage._map.get(STORAGE_KEY)!).wires).toBe('all');
+    // A fresh store reading the same storage keeps the persisted choice.
+    expect(createSettingsStore({ storage }).get().wires).toBe('all');
   });
 });
 

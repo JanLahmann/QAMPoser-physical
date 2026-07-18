@@ -179,9 +179,25 @@ body,
   display: flex;
 }
 
-.pk-stage-editor > :first-child {
+/* Auto-fit wrapper. With no inline style (roomy stages, scale 1) it stretches
+   exactly like the editor used to; when the fit hook scales it down it flips to
+   inline flex:none + fixed height + transform (see App.tsx). */
+.pk-editor-scale {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+}
+
+.pk-editor-scale > :first-child {
   flex: 1;
   min-height: 0;
+}
+
+/* Below the min scale the editor scrolls vertically instead of shrinking. */
+.pk-stage-editor.is-scroll {
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
 }
 
 .pk-side {
@@ -396,6 +412,14 @@ body,
 .is-micro .pk-h-bar {
   background: #1c6ea0;
   border-radius: 1px 1px 0 0;
+}
+
+/* Zero-probability stub in the fixed 3-qubit axis: present but faded. */
+.pk-h-col.is-dim {
+  opacity: 0.45;
+}
+.pk-h-col.is-dim .pk-h-bar {
+  background: var(--faint);
 }
 
 .pk-h-stack {
@@ -1358,6 +1382,12 @@ body,
 
 /* -- shared phone chrome: condensed topbar, 44px targets, no hint ticker -- */
 @media (max-width: 699px), (max-height: 450px) {
+  /* Size to the *visual* viewport so iOS Safari's dynamic URL bar can't push
+     the RESULTS panel off-screen (100dvh, not 100vh). */
+  .pk {
+    height: 100dvh;
+  }
+
   .pk-topbar {
     gap: 0.5rem;
     padding-left: max(0.75rem, env(safe-area-inset-left));
@@ -1493,23 +1523,31 @@ body,
 
   .pk-side > * {
     order: 3;
-    padding: 0.75rem;
+    flex: none;
+    padding: 0.6rem 0.75rem;
     min-width: 0;
   }
 
+  /* The stage grows to fill the gap between the camera strip and RESULTS, so
+     the results panel is always on-screen in the default view without
+     scrolling. It is a flex column: docked message strip on top, editor below. */
   .pk-stage {
     order: 2;
-    height: 28vh;
-    min-height: 8rem;
+    flex: 1 1 auto;
+    min-height: 7rem;
     padding: 0.5rem;
+    display: flex;
+    flex-direction: column;
   }
 
   .pk-stage-editor {
+    flex: 1;
     overflow-x: auto;
     overflow-y: hidden;
   }
 
-  /* The camera panel is the sidebar's first child → the top strip. */
+  /* The camera panel is the sidebar's first child → the top strip, capped at
+     22vh so it never dominates the viewport. */
   .pk-side > *:first-child {
     order: 1;
     padding: 0;
@@ -1521,11 +1559,38 @@ body,
 
   .pk-cam {
     aspect-ratio: 16 / 9;
-    max-height: 32vh;
+    max-height: 22vh;
     width: 100%;
     border-radius: 0;
     border-left: none;
     border-right: none;
+  }
+
+  /* Message strip: a docked full-width row at the TOP of the stage (between the
+     camera and the wires), never an overlay — so it can never hide a wire.
+     Single line, ellipsis on overflow. */
+  .pk-strip {
+    position: static;
+    order: -1;
+    left: auto;
+    right: auto;
+    bottom: auto;
+    width: 100%;
+    max-width: 100%;
+    flex: none;
+    background: transparent;
+    border: none;
+    border-radius: 0;
+    padding: 0.1rem 0.35rem 0.3rem;
+    pointer-events: none;
+  }
+
+  .pk-strip__text {
+    display: block;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-size: 0.85rem;
   }
 
   /* Left-side sidebar setting is meaningless in a single-column stack. */

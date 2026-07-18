@@ -13,6 +13,7 @@ import {
   type Mode,
   type PanelId,
   type Side,
+  type Wires,
 } from './settings';
 
 const PANEL_LABELS: Record<PanelId, string> = {
@@ -143,6 +144,18 @@ export function SettingsControl() {
                     onChange={() => settingsStore.togglePanel(p)}
                   />
                 ))}
+              </section>
+
+              <section className="pk-drawer-sec">
+                <div className="pk-label">Wires</div>
+                <Segmented<Wires>
+                  value={settings.wires}
+                  options={[
+                    { value: 'compact', label: 'auto' },
+                    { value: 'all', label: 'all 5' },
+                  ]}
+                  onChange={(wires) => settingsStore.update({ wires })}
+                />
               </section>
 
               <section className="pk-drawer-sec">

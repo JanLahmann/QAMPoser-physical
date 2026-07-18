@@ -16,6 +16,13 @@ import { useSyncExternalStore } from 'react';
 export type Mode = 'composer' | 'golf';
 export type Side = 'left' | 'right';
 export type PanelId = 'camera' | 'results' | 'state' | 'qasm';
+/**
+ * Wire-count DISPLAY mode (docs/pocket.md, "Qubit count"). Purely cosmetic — the
+ * physical table and the recognized circuit are ALWAYS five qubits; this only
+ * decides how many wires the editor draws. 'compact' shows the used rows
+ * (minimum 3, auto-grows to 4/5 as tiles land on q3/q4), 'all' always shows 5.
+ */
+export type Wires = 'compact' | 'all';
 
 export const PANEL_IDS: readonly PanelId[] = ['camera', 'results', 'state', 'qasm'];
 
@@ -25,6 +32,7 @@ export interface Settings {
   readonly side: Side;
   readonly lowpower: boolean;
   readonly debug: boolean;
+  readonly wires: Wires;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -33,6 +41,7 @@ export const DEFAULT_SETTINGS: Settings = {
   side: 'right',
   lowpower: false,
   debug: false,
+  wires: 'compact',
 };
 
 /**
@@ -107,6 +116,9 @@ export function parseUrlOverrides(search: string): Partial<Settings> {
   const panels = parsePanels(params.get('panels'));
   if (panels !== undefined) out.panels = panels;
 
+  const wires = params.get('wires');
+  if (wires === 'compact' || wires === 'all') out.wires = wires;
+
   return out;
 }
 
@@ -118,12 +130,14 @@ export function sanitize(raw: unknown): Settings {
   const panels = Array.isArray(r.panels)
     ? (r.panels.filter((p): p is PanelId => (PANEL_IDS as readonly string[]).includes(p as string)) as PanelId[])
     : [...DEFAULT_SETTINGS.panels];
+  const wires: Wires = r.wires === 'all' ? 'all' : 'compact';
   return {
     mode,
     panels,
     side,
     lowpower: r.lowpower === true,
     debug: r.debug === true,
+    wires,
   };
 }
 

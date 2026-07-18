@@ -9,7 +9,7 @@
  *   changes; golf drives its own celebrations (hole-in banner). Settings live in
  *   localStorage with URL overrides; a debug panel appends the pipeline stats.
  */
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import {
   ThemeProvider,
   QamposerProvider,
@@ -32,6 +32,8 @@ import { SettingsControl } from './SettingsDrawer';
 import { GuidePage } from './GuidePage';
 import { useRoute } from './hashNav';
 import { useSettings, type PanelId } from './settings';
+import { displayCircuit } from './displayWires';
+import { editorFit, editorNaturalHeight, type EditorFit } from './editorFit';
 import {
   golfStep,
   initialGolfState,
@@ -116,6 +118,42 @@ function useFullscreen() {
     else requestFullscreen(document.documentElement);
   }, []);
   return { supported, active, toggle };
+}
+
+/**
+ * Vertical auto-fit for the recognized-circuit editor. Measures the stage's
+ * available height (ResizeObserver on the editor container) and derives a scale
+ * from the editor's natural height (D wires x row height + chrome) so all
+ * `displayQubits` wires always fit — no clipping. On roomy iPad/desktop stages
+ * the available height already exceeds the natural height, so the scale stays 1
+ * and nothing changes there.
+ */
+function useEditorFit(displayQubits: number): {
+  containerRef: React.RefObject<HTMLDivElement>;
+  fit: EditorFit & { natural: number };
+} {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const natural = editorNaturalHeight(displayQubits);
+  const [fit, setFit] = useState<EditorFit>({ scale: 1, scroll: false });
+
+  useLayoutEffect(() => {
+    const measure = () => {
+      const container = containerRef.current;
+      if (!container) return;
+      const next = editorFit(container.clientHeight, natural);
+      setFit((prev) => (prev.scale === next.scale && prev.scroll === next.scroll ? prev : next));
+    };
+    measure();
+    const ro = new ResizeObserver(measure);
+    if (containerRef.current) ro.observe(containerRef.current);
+    window.addEventListener('resize', measure);
+    return () => {
+      ro.disconnect();
+      window.removeEventListener('resize', measure);
+    };
+  }, [natural]);
+
+  return { containerRef, fit: { ...fit, natural } };
 }
 
 function FullscreenButton({ variant }: { variant: 'bar' | 'cam' }) {
@@ -345,6 +383,30 @@ export function App() {
 
   const qamposerConfig = useMemo(() => ({ maxQubits: BOARD_QUBITS }), []);
 
+  // Display-only wire count: the recognized `circuit` is always 5 qubits, but
+  // the editor draws `settings.wires` wires (compact auto-grows 3→5). Panels,
+  // simulation, histogram and QASM all keep the physical 5-qubit `circuit`.
+  const displayed = useMemo(() => displayCircuit(circuit, settings.wires), [circuit, settings.wires]);
+
+  // Auto-fit the editor so every displayed wire is visible on short phone
+  // stages; a no-op (scale 1) on roomy iPad/desktop stages.
+  const { containerRef: editorContainerRef, fit: editorFitState } = useEditorFit(displayed.qubits);
+  const scaling = editorFitState.scale < 1;
+  const editorScaleStyle: React.CSSProperties | undefined = scaling
+    ? {
+        flex: 'none',
+        height: `${editorFitState.natural}px`,
+        width: `${100 / editorFitState.scale}%`,
+        transform: `scale(${editorFitState.scale})`,
+        transformOrigin: 'top left',
+        // Reclaim the layout space the shrunk editor no longer occupies (top-left
+        // origin leaves scaled-away space to its right and below) so the column
+        // doesn't gain phantom horizontal/vertical scroll.
+        marginBottom: `${-(editorFitState.natural * (1 - editorFitState.scale))}px`,
+        marginRight: `${-(100 / editorFitState.scale - 100)}%`,
+      }
+    : undefined;
+
   const running = camera.status === 'running';
   const boardLocked = corners >= 3;
   const camPill = running
@@ -377,7 +439,7 @@ export function App() {
     .map((p) => {
       switch (p) {
         case 'results':
-          return <ResultsHistogram key="results" circuit={circuit} />;
+          return <ResultsHistogram key="results" circuit={circuit} displayQubits={displayed.qubits} />;
         case 'state':
           return <StatePanel key="state" circuit={circuit} />;
         case 'qasm':
@@ -392,7 +454,9 @@ export function App() {
       {showCamera && cameraPanel}
       <QSphere2D key="qsphere" circuit={circuit} targets={golfTargets} />
       <Scorecard key="scorecard" state={golfState} circuit={circuit} />
-      {hasPanel('results') && <ResultsHistogram key="results" circuit={circuit} />}
+      {hasPanel('results') && (
+        <ResultsHistogram key="results" circuit={circuit} displayQubits={displayed.qubits} />
+      )}
       {hasPanel('state') && <StatePanel key="state" circuit={circuit} />}
       {hasPanel('qasm') && <QasmPanel key="qasm" circuit={circuit} />}
       {settings.debug && <DebugPanel key="debug" frame={lastFrameRef.current} fps={camera.fps} />}
@@ -436,7 +500,7 @@ export function App() {
       </header>
 
       <ThemeProvider defaultTheme="dark">
-        <QamposerProvider circuit={circuit} config={qamposerConfig}>
+        <QamposerProvider circuit={displayed} config={qamposerConfig}>
           <main className={`pk-main ${settings.side === 'left' ? 'pk-side-left' : ''}`}>
             {/* Phone-only amber toast (footer hint ticker is hidden on phones);
                 CSS reveals it only under the phone breakpoints. */}
@@ -449,8 +513,13 @@ export function App() {
               </div>
             )}
             <section className="pk-stage">
-              <div className="pk-stage-editor">
-                <CircuitEditor />
+              <div
+                className={`pk-stage-editor ${editorFitState.scroll ? 'is-scroll' : ''}`}
+                ref={editorContainerRef}
+              >
+                <div className="pk-editor-scale" style={editorScaleStyle}>
+                  <CircuitEditor />
+                </div>
               </div>
               <MessageStrip message={strip} />
             </section>
