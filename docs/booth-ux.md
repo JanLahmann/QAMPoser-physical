@@ -146,13 +146,28 @@ Compare against canonical states up to global phase, fidelity ≥ 0.99.
 
 ## Scaling, modes, branding, help (v2 additions, 2026-07-18)
 
-**RESULTS at high qubit counts** — strategy switches on active-qubit count:
-≤3 active (≤8 outcomes): labeled bars as mocked. 4–5 active: sort by
-probability, show top 6 bars, aggregate the tail as one muted summary row
-("+26 outcomes ≤ 3%"). Uniform superposition (all outcomes equal) renders as a
-flat-line glyph + "2^k equally likely outcomes" — a featured state, not a
-failed chart. The Q-sphere (post-upstream) is the scale-proof view and takes
-the RESULTS top slot when available; bars become secondary.
+**RESULTS at high qubit counts** — the sidebar histogram is **vertical**
+(per Jan 2026-07-18): one row per outcome — mono basis label left, bar growing
+right, % on the bar — sorted by probability. ≤8 outcomes: all rows, roomy.
+More: top rows at full height, then the remaining outcomes as micro-rows
+(the full distribution stays visible as a *pattern* even at 32 rows; labels
+thin out to every 4th). Uniform superposition renders all-equal micro-rows +
+a "2^k equally likely outcomes" callout — a featured state, not a failed
+chart. (Variant B's bottom dock, being wide, may keep columns.) The Q-sphere
+(post-upstream) is the scale-proof view and takes the RESULTS top slot when
+available; bars become secondary.
+
+**Dynamic layout (panel system)** — yes, IBM-Composer-style, adapted to a
+screen with no input devices: every sidebar/dock section is a **panel** in a
+registry (results, state, qasm, qsphere, golf-scorecard, branding …). A
+layout = ordered list of visible panels + sidebar side (left/right) + stage
+mode. Reconfiguration happens OFF the booth screen: a "Layout" card on
+`/debug` (staff phone/laptop) with per-panel show/hide toggles and reorder
+arrows, broadcast live via an additive `select_layout` WS message; persisted
+to `layout.toml` next to `branding.toml`; URL params (`?panels=results,qasm`)
+for one-off kiosk setups; per-mode presets (composer/golf/attract ship with
+sensible defaults). The booth screen animates panel changes (200 ms slide,
+reduced-motion aware) so reconfiguration during an event looks intentional.
 
 **Display modes** — the booth is a mode host: `composer` (default), `golf`
 (Bloch/Q-sphere golf, when built — stage becomes the sphere, sidebar becomes
