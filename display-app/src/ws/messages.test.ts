@@ -9,29 +9,67 @@ import {
   type CircuitMessage,
   type DetectionMessage,
   type StatusMessage,
+  type LayoutMessage,
   type ClientHello,
   type SelectCamera,
+  type SelectMode,
+  type SelectLayout,
 } from './messages';
 
 // Vitest runs with cwd = display-app; the docs live one level up at repo root.
 const PROTOCOL_PATH = resolve(process.cwd(), '..', 'docs', 'protocol.md');
 const PROTOCOL = readFileSync(PROTOCOL_PATH, 'utf8');
 
-/** Strip JSONC (// and block comments) and trailing commas, then JSON.parse. */
-function parseJsonc(block: string): unknown {
+/** Strip JSONC (// and block comments) and trailing commas. */
+function stripJsonc(block: string): string {
   const noBlock = block.replace(/\/\*[\s\S]*?\*\//g, '');
   const noLine = noBlock.replace(/^\s*\/\/.*$/gm, '').replace(/\/\/.*$/gm, '');
-  const noTrailingComma = noLine.replace(/,(\s*[}\]])/g, '$1');
-  return JSON.parse(noTrailingComma);
+  return noLine.replace(/,(\s*[}\]])/g, '$1');
 }
 
-/** Extract every ```jsonc fenced block from the protocol doc. */
+/**
+ * Split a comment-stripped string into its top-level `{...}` object substrings.
+ * A single fenced block may document more than one message (e.g. `select_mode`
+ * + `select_layout` share one block), so parse each object independently.
+ */
+function splitTopLevelObjects(text: string): string[] {
+  const objects: string[] = [];
+  let depth = 0;
+  let start = -1;
+  let inStr = false;
+  let esc = false;
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
+    if (inStr) {
+      if (esc) esc = false;
+      else if (ch === '\\') esc = true;
+      else if (ch === '"') inStr = false;
+      continue;
+    }
+    if (ch === '"') inStr = true;
+    else if (ch === '{') {
+      if (depth === 0) start = i;
+      depth++;
+    } else if (ch === '}') {
+      depth--;
+      if (depth === 0 && start >= 0) {
+        objects.push(text.slice(start, i + 1));
+        start = -1;
+      }
+    }
+  }
+  return objects;
+}
+
+/** Extract every JSON object from every ```jsonc fenced block in the doc. */
 function extractJsoncBlocks(md: string): unknown[] {
   const re = /```jsonc\n([\s\S]*?)```/g;
   const blocks: unknown[] = [];
   let m: RegExpExecArray | null;
   while ((m = re.exec(md)) !== null) {
-    blocks.push(parseJsonc(m[1]));
+    for (const obj of splitTopLevelObjects(stripJsonc(m[1]))) {
+      blocks.push(JSON.parse(obj));
+    }
   }
   return blocks;
 }
@@ -77,12 +115,33 @@ const selectCameraSample = {
   index: 0,
 } satisfies SelectCamera;
 
+const layoutSample = {
+  type: 'layout',
+  mode: 'composer',
+  sidebar: 'right',
+  panels: ['results'],
+} satisfies LayoutMessage;
+
+const selectModeSample = {
+  type: 'select_mode',
+  mode: 'golf',
+} satisfies SelectMode;
+
+const selectLayoutSample = {
+  type: 'select_layout',
+  sidebar: 'left',
+  panels: ['results'],
+} satisfies SelectLayout;
+
 const SAMPLES: Record<string, unknown> = {
   circuit: circuitSample,
   detection: detectionSample,
   status: statusSample,
+  layout: layoutSample,
   hello: helloSample,
   select_camera: selectCameraSample,
+  select_mode: selectModeSample,
+  select_layout: selectLayoutSample,
 };
 
 /**
@@ -122,9 +181,10 @@ function assertKeysSubset(doc: unknown, sample: unknown, path: string): void {
 
 describe('protocol.md ⇄ messages.ts parity', () => {
   it('finds the documented jsonc blocks', () => {
-    // Fenced ```jsonc blocks: circuit, detection, status, hello, select_camera.
+    // Documented objects: circuit, detection, status, hello, select_camera,
+    // layout, select_mode, select_layout (the last two share one fenced block).
     // (The /ws/frames capture hello is inline code, not a fenced block.)
-    expect(DOC_BLOCKS.length).toBeGreaterThanOrEqual(5);
+    expect(DOC_BLOCKS.length).toBeGreaterThanOrEqual(8);
   });
 
   it('every documented block `type` is a known message type', () => {

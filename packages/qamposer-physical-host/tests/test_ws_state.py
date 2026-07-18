@@ -25,6 +25,7 @@ def test_hello_sets_role_label():
     with TestClient(app) as client:
         with client.websocket_connect("/ws/state") as ws:
             ws.receive_json()  # initial status
+            ws.receive_json()  # replayed layout
             ws.send_json({"type": "hello", "role": "debug", "client": "booth-screen"})
             # follow with select_camera so we can await a status round-trip
             ws.send_json({"type": "select_camera", "kind": "cv2", "index": 0})
@@ -43,6 +44,7 @@ def test_select_camera_calls_swap_source():
     with TestClient(app) as client:
         with client.websocket_connect("/ws/state") as ws:
             ws.receive_json()  # initial status
+            ws.receive_json()  # replayed layout
             ws.send_json({"type": "select_camera", "kind": "cv2", "index": 2})
             status = ws.receive_json()
             assert status["type"] == "status"
@@ -56,6 +58,7 @@ def test_malformed_json_ignored():
     with TestClient(app) as client:
         with client.websocket_connect("/ws/state") as ws:
             ws.receive_json()  # initial status
+            ws.receive_json()  # replayed layout
             ws.send_text("this is not json {")
             ws.send_text('{"type": 42}')  # not a real message, but valid JSON
             # connection still alive; a valid select_camera still works:

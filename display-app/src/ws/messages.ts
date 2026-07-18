@@ -90,8 +90,33 @@ export interface StatusMessage {
   clients: number;
 }
 
+/** Booth display mode (booth-v2). Golf is hidden until implemented. */
+export type DisplayMode = 'composer' | 'golf' | 'attract';
+
+/** Which side the sidebar docks on (booth-v2). */
+export type SidebarSide = 'right' | 'left';
+
+/**
+ * `layout` — panel/mode state (additive, booth-v2).
+ *
+ * `panels` are registry names in display order (`results`, `state`, `qasm`,
+ * `qsphere`, `scorecard`, `minicircuit`, `branding`, …). Unknown names are
+ * ignored by clients (forward-compatible). Broadcast on change; the latest is
+ * replayed to new clients after `status`.
+ */
+export interface LayoutMessage {
+  type: 'layout';
+  mode: DisplayMode;
+  sidebar: SidebarSide;
+  panels: string[];
+}
+
 /** Discriminated union of everything the server can push on `/ws/state`. */
-export type ServerMessage = CircuitMessage | DetectionMessage | StatusMessage;
+export type ServerMessage =
+  | CircuitMessage
+  | DetectionMessage
+  | StatusMessage
+  | LayoutMessage;
 
 // ---------------------------------------------------------------------------
 // Client → server messages
@@ -115,17 +140,38 @@ export interface SelectCamera {
   index?: number;
 }
 
-export type ClientMessage = ClientHello | SelectCamera;
+/** `select_mode` — switch the booth's display mode (additive, booth-v2). */
+export interface SelectMode {
+  type: 'select_mode';
+  mode: DisplayMode;
+}
+
+/**
+ * `select_layout` — reconfigure the panel layout (additive, booth-v2).
+ * Partial: omitted fields keep their current server-side value.
+ */
+export interface SelectLayout {
+  type: 'select_layout';
+  sidebar?: SidebarSide;
+  panels?: string[];
+}
+
+export type ClientMessage = ClientHello | SelectCamera | SelectMode | SelectLayout;
 
 // ---------------------------------------------------------------------------
 // Type-string tables (consumed by the parity test)
 // ---------------------------------------------------------------------------
 
 /** Every `type` the server can send on `/ws/state`. */
-export const SERVER_MESSAGE_TYPES = ['circuit', 'detection', 'status'] as const;
+export const SERVER_MESSAGE_TYPES = ['circuit', 'detection', 'status', 'layout'] as const;
 
 /** Every `type` the client can send on `/ws/state`. */
-export const CLIENT_MESSAGE_TYPES = ['hello', 'select_camera'] as const;
+export const CLIENT_MESSAGE_TYPES = [
+  'hello',
+  'select_camera',
+  'select_mode',
+  'select_layout',
+] as const;
 
 /** Union of all documented `type` discriminators (server + client). */
 export const ALL_MESSAGE_TYPES = [

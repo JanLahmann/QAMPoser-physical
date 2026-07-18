@@ -19,6 +19,7 @@ import type {
   ClientMessage,
   ClientRole,
   DetectionMessage,
+  LayoutMessage,
   ServerMessage,
   StatusMessage,
 } from './messages';
@@ -36,6 +37,8 @@ export interface StateSnapshot {
   readonly detection?: DetectionMessage;
   /** Latest `status` message. */
   readonly status?: StatusMessage;
+  /** Latest `layout` message (panel/mode state; booth-v2, additive). */
+  readonly layout?: LayoutMessage;
   readonly connectionState: ConnectionState;
   /** Last accepted circuit `seq`, or null before any circuit arrives. */
   readonly lastSeq: number | null;
@@ -160,6 +163,14 @@ export class StateSocket {
     return false;
   }
 
+  /**
+   * Send any client message (alias of {@link send}). Named for call sites that
+   * push `select_mode` / `select_layout` from the /debug Layout card.
+   */
+  sendMessage(message: ClientMessage): boolean {
+    return this.send(message);
+  }
+
   // --- internals ----------------------------------------------------------
 
   private open(): void {
@@ -229,6 +240,9 @@ export class StateSocket {
         break;
       case 'status':
         this.patch({ status: msg });
+        break;
+      case 'layout':
+        this.patch({ layout: msg });
         break;
       default:
         // Unknown `type` — additive protocol change; ignore per spec.

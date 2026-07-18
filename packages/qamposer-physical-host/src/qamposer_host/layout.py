@@ -1,0 +1,188 @@
+"""Display layout state (booth-v2 panel/mode system) + its REST endpoint.
+
+A *layout* is the booth's current display mode, sidebar side, and the ordered
+list of visible panels (registry names). It is reconfigured OFF the booth screen
+(the ``/debug`` "Layout" card, ``select_mode`` / ``select_layout`` WS messages)
+and persisted to ``layout.toml`` next to the other host config files.
+
+* :class:`LayoutState` — the immutable-ish value object serialized on the wire.
+* :class:`LayoutStore` — owns the current state, applies partial updates with the
+  protocol's "omitted fields keep their value" semantics, and persists to TOML.
+* :func:`default_panels` — the per-mode panel preset.
+
+Persistence is dependency-free: reads use stdlib ``tomllib`` (3.11+), writes use
+a tiny hand-rolled TOML serializer (the schema is three flat keys).
+"""
+
+from __future__ import annotations
+
+import logging
+import tomllib
+from dataclasses import dataclass, field
+from pathlib import Path
+
+from fastapi import APIRouter, Request
+
+logger = logging.getLogger("qamposer_host.layout")
+
+router = APIRouter()
+
+DEFAULT_MODE = "composer"
+DEFAULT_SIDEBAR = "right"
+VALID_SIDEBARS = ("left", "right")
+
+#: Per-mode default (preset) panel stacks, in display order (registry names).
+MODE_PANELS: dict[str, list[str]] = {
+    "composer": ["results", "state", "qasm"],
+    "golf": ["scorecard", "minicircuit", "results"],
+    "attract": [],
+}
+
+#: The modes ``select_mode`` accepts. Unknown modes are ignored (never fatal).
+VALID_MODES = tuple(MODE_PANELS)
+
+
+def default_panels(mode: str) -> list[str]:
+    """The preset panel stack for ``mode`` (empty list for unknown modes)."""
+    return list(MODE_PANELS.get(mode, []))
+
+
+@dataclass
+class LayoutState:
+    """Current display layout: mode + sidebar side + visible panels (ordered)."""
+
+    mode: str = DEFAULT_MODE
+    sidebar: str = DEFAULT_SIDEBAR
+    panels: list[str] = field(default_factory=lambda: default_panels(DEFAULT_MODE))
+
+    def to_message(self) -> dict:
+        """The ``layout`` server message (camelCase wire JSON is already flat)."""
+        return {
+            "type": "layout",
+            "mode": self.mode,
+            "sidebar": self.sidebar,
+            "panels": list(self.panels),
+        }
+
+    def to_dict(self) -> dict:
+        return {"mode": self.mode, "sidebar": self.sidebar, "panels": list(self.panels)}
+
+
+def _toml_str(value: str) -> str:
+    return '"' + value.replace("\\", "\\\\").replace('"', '\\"') + '"'
+
+
+def _dump_toml(state: LayoutState) -> str:
+    panels = ", ".join(_toml_str(p) for p in state.panels)
+    return (
+        f"mode = {_toml_str(state.mode)}\n"
+        f"sidebar = {_toml_str(state.sidebar)}\n"
+        f"panels = [{panels}]\n"
+    )
+
+
+def _state_from_toml(data: dict) -> LayoutState:
+    mode = data.get("mode")
+    sidebar = data.get("sidebar")
+    panels = data.get("panels")
+    state = LayoutState()
+    if isinstance(mode, str):
+        state.mode = mode
+    if isinstance(sidebar, str) and sidebar in VALID_SIDEBARS:
+        state.sidebar = sidebar
+    if isinstance(panels, list):
+        state.panels = [str(p) for p in panels]
+    return state
+
+
+class LayoutStore:
+    """Owns the live :class:`LayoutState` and its ``layout.toml`` persistence.
+
+    ``path=None`` disables persistence (state is in-memory only) — handy for
+    tests and ``--no-persist`` style runs.
+    """
+
+    def __init__(self, path: Path | str | None = None) -> None:
+        self._path = Path(path) if path is not None else None
+        self._state = LayoutState()
+        self._load()
+
+    # -- accessors ---------------------------------------------------------
+
+    @property
+    def state(self) -> LayoutState:
+        return self._state
+
+    def message(self) -> dict:
+        return self._state.to_message()
+
+    # -- mutations (persist on change) -------------------------------------
+
+    def select_mode(self, mode: str) -> LayoutState:
+        """Switch mode and reset panels to that mode's preset.
+
+        Unknown modes are ignored (state unchanged) — the wire protocol only
+        defines ``composer`` / ``golf`` / ``attract``.
+        """
+        if mode not in VALID_MODES:
+            logger.info("ignoring select_mode with unknown mode: %r", mode)
+            return self._state
+        self._state.mode = mode
+        self._state.panels = default_panels(mode)
+        self._save()
+        return self._state
+
+    def apply_layout(
+        self,
+        *,
+        sidebar: str | None = None,
+        panels: list[str] | None = None,
+    ) -> LayoutState:
+        """Partial update: ``None`` fields keep their current value.
+
+        Unknown panel names pass through untouched (forward-compatible); the
+        server never validates the registry — clients ignore names they lack.
+        """
+        changed = False
+        if sidebar is not None:
+            if sidebar in VALID_SIDEBARS:
+                self._state.sidebar = sidebar
+                changed = True
+            else:
+                logger.info("ignoring select_layout with unknown sidebar: %r", sidebar)
+        if panels is not None:
+            self._state.panels = [str(p) for p in panels]
+            changed = True
+        if changed:
+            self._save()
+        return self._state
+
+    # -- persistence -------------------------------------------------------
+
+    def _load(self) -> None:
+        if self._path is None or not self._path.is_file():
+            return
+        try:
+            with self._path.open("rb") as fh:
+                data = tomllib.load(fh)
+        except (OSError, tomllib.TOMLDecodeError):
+            logger.warning("could not read layout file %s; using defaults",
+                           self._path, exc_info=True)
+            return
+        self._state = _state_from_toml(data)
+
+    def _save(self) -> None:
+        if self._path is None:
+            return
+        try:
+            self._path.parent.mkdir(parents=True, exist_ok=True)
+            self._path.write_text(_dump_toml(self._state), encoding="utf-8")
+        except OSError:
+            logger.warning("could not persist layout to %s", self._path, exc_info=True)
+
+
+@router.get("/api/layout")
+async def get_layout(request: Request) -> dict:
+    """Current layout as JSON — the REST sibling of the ``layout`` WS message."""
+    store: LayoutStore = request.app.state.layout_store
+    return store.state.to_dict()

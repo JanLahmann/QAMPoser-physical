@@ -22,7 +22,8 @@ DEFAULT_PORT = 8443
 DEFAULT_SOURCE = "replay:tests/fixtures/recordings/bell-sequence"
 DEFAULT_BACKEND = "off"
 DEFAULT_DISPLAY_DIST = Path("display-app/dist")
-DEFAULT_CERT_DIR = Path.home() / ".qamposer-physical" / "certs"
+DEFAULT_CONFIG_DIR = Path.home() / ".qamposer-physical"
+DEFAULT_CERT_DIR = DEFAULT_CONFIG_DIR / "certs"
 DEFAULT_REPLAY_DIR = Path("tests/fixtures/recordings")
 
 _ENV_PREFIX = "QAMPOSER_"
@@ -43,16 +44,42 @@ class HostConfig:
     source: str = DEFAULT_SOURCE
     backend: str = DEFAULT_BACKEND
     display_dist: Path = field(default_factory=lambda: DEFAULT_DISPLAY_DIST)
+    config_dir: Path = field(default_factory=lambda: DEFAULT_CONFIG_DIR)
     cert_dir: Path = field(default_factory=lambda: DEFAULT_CERT_DIR)
     replay_dir: Path = field(default_factory=lambda: DEFAULT_REPLAY_DIR)
+    #: Explicit overrides for the booth-v2 config files; ``None`` → derive from
+    #: ``config_dir`` (see :attr:`resolved_layout_file` / :attr:`resolved_branding_file`).
+    layout_file: Path | None = None
+    branding_file: Path | None = None
     tls: bool = True
 
     def __post_init__(self) -> None:
         self.port = int(self.port)
         self.tls = bool(self.tls)
         self.display_dist = Path(self.display_dist)
+        self.config_dir = Path(self.config_dir)
         self.cert_dir = Path(self.cert_dir)
         self.replay_dir = Path(self.replay_dir)
+        if self.layout_file is not None:
+            self.layout_file = Path(self.layout_file)
+        if self.branding_file is not None:
+            self.branding_file = Path(self.branding_file)
+
+    # --- booth-v2 config files --------------------------------------------
+
+    @property
+    def resolved_layout_file(self) -> Path:
+        """Where ``layout.toml`` lives: explicit override or ``config_dir/layout.toml``."""
+        if self.layout_file is not None:
+            return self.layout_file
+        return self.config_dir / "layout.toml"
+
+    @property
+    def resolved_branding_file(self) -> Path:
+        """Where ``branding.toml`` lives: explicit override or ``config_dir/branding.toml``."""
+        if self.branding_file is not None:
+            return self.branding_file
+        return self.config_dir / "branding.toml"
 
     # --- backend helpers ---------------------------------------------------
 
@@ -92,8 +119,11 @@ class HostConfig:
         take("source", "SOURCE")
         take("backend", "BACKEND")
         take("display_dist", "DISPLAY_DIST")
+        take("config_dir", "CONFIG_DIR")
         take("cert_dir", "CERT_DIR")
         take("replay_dir", "REPLAY_DIR")
+        take("layout_file", "LAYOUT_FILE")
+        take("branding_file", "BRANDING_FILE")
         if (raw := env.get(_ENV_PREFIX + "NO_TLS")) is not None:
             values["tls"] = raw.strip().lower() not in ("1", "true", "yes", "on")
 

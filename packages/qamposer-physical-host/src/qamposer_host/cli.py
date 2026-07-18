@@ -35,6 +35,9 @@ def _build_parser() -> argparse.ArgumentParser:
     run.add_argument("--backend", default=None, help="off | url:<base-url> | spawn")
     run.add_argument("--display-dist", default=None, help="path to built display app")
     run.add_argument("--cert-dir", default=None, help="TLS cert directory")
+    run.add_argument("--config-dir", default=None,
+                    help="config dir for layout.toml / branding.toml (default ~/.qamposer-physical)")
+    run.add_argument("--branding", default=None, help="path to branding.toml")
     run.add_argument("--open", action="store_true", help="open a browser on start")
     _add_common(run)
 
@@ -52,6 +55,8 @@ def _config_from_run_args(args: argparse.Namespace) -> HostConfig:
         backend=args.backend,
         display_dist=args.display_dist,
         cert_dir=args.cert_dir,
+        config_dir=args.config_dir,
+        branding_file=args.branding,
         tls=False if args.no_tls else None,
     )
 

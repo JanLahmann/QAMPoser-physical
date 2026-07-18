@@ -19,9 +19,11 @@ import logging
 import httpx
 from fastapi import FastAPI
 
-from . import preview, proxy, static, ws_frames, ws_state
+from . import branding, layout, preview, proxy, static, ws_frames, ws_state
+from .branding import load_branding
 from .config import HostConfig, build_frame_source, camera_from_spec, ensure_push_source
 from .hub import Hub
+from .layout import LayoutStore
 from .proxy import BackendHealth
 
 logger = logging.getLogger("qamposer_host.main")
@@ -53,8 +55,13 @@ def create_app(
         config.backend_url, lambda: app.state.http_client
     )
 
+    # booth-v2: persisted display layout + event branding.
+    app.state.layout_store = LayoutStore(config.resolved_layout_file)
+    app.state.branding = load_branding(config.resolved_branding_file)
+
     hub.set_camera(camera_from_spec(config.source, connected=False))
     hub.set_backend(enabled=config.backend_mode != "off", healthy=False)
+    hub.set_layout(app.state.layout_store.message())  # seed late-joiner replay
 
     # Order matters: the static catch-all ("/{path}") must be registered LAST so
     # it never shadows the API / WS / debug routes.
@@ -62,6 +69,8 @@ def create_app(
     app.include_router(ws_frames.router)
     app.include_router(preview.router)
     app.include_router(proxy.router)
+    app.include_router(layout.router)
+    app.include_router(branding.router)
     app.include_router(static.router)
 
     return app

@@ -57,6 +57,10 @@ async def _handle_message(websocket: WebSocket, raw: str) -> None:
         websocket.app.state.hub.set_role(websocket, role, label)
     elif mtype == "select_camera":
         await _handle_select_camera(websocket, msg)
+    elif mtype == "select_mode":
+        await _handle_select_mode(websocket, msg)
+    elif mtype == "select_layout":
+        await _handle_select_layout(websocket, msg)
     else:
         logger.info("ignoring unknown /ws/state message type: %r", mtype)
 
@@ -90,3 +94,24 @@ async def _handle_select_camera(websocket: WebSocket, msg: dict) -> None:
 
     hub.set_camera(camera_from_spec(spec, connected=source is not None))
     await hub.publish_status()
+
+
+async def _handle_select_mode(websocket: WebSocket, msg: dict) -> None:
+    mode = msg.get("mode")
+    if not isinstance(mode, str):
+        logger.info("ignoring select_mode without a string mode: %r", msg)
+        return
+    store = websocket.app.state.layout_store
+    store.select_mode(mode)
+    await websocket.app.state.hub.publish_layout(store.message())
+
+
+async def _handle_select_layout(websocket: WebSocket, msg: dict) -> None:
+    sidebar = msg.get("sidebar")
+    panels = msg.get("panels")
+    store = websocket.app.state.layout_store
+    store.apply_layout(
+        sidebar=sidebar if isinstance(sidebar, str) else None,
+        panels=[str(p) for p in panels] if isinstance(panels, list) else None,
+    )
+    await websocket.app.state.hub.publish_layout(store.message())

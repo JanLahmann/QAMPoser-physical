@@ -6,8 +6,10 @@
  *
  * Everything here is read-only diagnostics; nothing feeds back to the host.
  */
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type CSSProperties } from 'react';
 import { useEntangibleState } from '../ws/useEntangibleState';
+import { getStateSocket } from '../ws/stateSocket';
+import type { DisplayMode, SidebarSide } from '../ws/messages';
 import { markerLabel } from './markerLabels';
 
 function fmt(n: number | null | undefined, digits = 2): string {
@@ -79,6 +81,137 @@ function PhoneCameraCard() {
               </li>
             </ol>
           </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+const DISPLAY_MODES: DisplayMode[] = ['composer', 'golf', 'attract'];
+
+/** Known panel registry names (booth-v2). Live layout may add more. */
+const PANEL_REGISTRY = [
+  'results',
+  'state',
+  'qasm',
+  'qsphere',
+  'scorecard',
+  'minicircuit',
+  'branding',
+];
+
+/**
+ * "Layout" card: staff-facing mode/panel/sidebar controls. Reflects the live
+ * `layout` message and pushes `select_mode` / `select_layout` back to the host.
+ * The booth screen consumes the broadcast — this card never touches it directly.
+ */
+function LayoutCard() {
+  const { layout } = useEntangibleState();
+  const socket = getStateSocket();
+
+  const mode = layout?.mode;
+  const sidebar = layout?.sidebar;
+  const panels = layout?.panels ?? [];
+
+  // Registry order first, then any live panels not in the registry.
+  const knownPanels = [
+    ...PANEL_REGISTRY,
+    ...panels.filter((p) => !PANEL_REGISTRY.includes(p)),
+  ];
+
+  const setMode = (m: DisplayMode) => socket.sendMessage({ type: 'select_mode', mode: m });
+  const setSidebar = (s: SidebarSide) =>
+    socket.sendMessage({ type: 'select_layout', sidebar: s });
+  const togglePanel = (panel: string, show: boolean) => {
+    const next = show
+      ? [...panels, panel]
+      : panels.filter((p) => p !== panel);
+    socket.sendMessage({ type: 'select_layout', panels: next });
+  };
+
+  const pillStyle = (active: boolean): CSSProperties => ({
+    padding: '0.3rem 0.8rem',
+    borderRadius: 999,
+    border: '1px solid var(--ent-border, #333)',
+    background: active ? 'var(--ent-accent, #0f62fe)' : 'transparent',
+    color: active ? '#fff' : 'var(--ent-text, #e6e6ea)',
+    cursor: 'pointer',
+    fontSize: '0.85rem',
+    textTransform: 'capitalize',
+  });
+
+  return (
+    <section className="debug__section">
+      <h2>layout</h2>
+      {!layout && (
+        <div className="debug__muted" style={{ marginBottom: '0.75rem' }}>
+          waiting for layout from host…
+        </div>
+      )}
+
+      <div style={{ marginBottom: '0.9rem' }}>
+        <div style={{ color: 'var(--ent-text-dim)', fontSize: '0.8rem', marginBottom: '0.35rem' }}>
+          mode
+        </div>
+        <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+          {DISPLAY_MODES.map((m) => (
+            <button
+              key={m}
+              type="button"
+              style={pillStyle(mode === m)}
+              onClick={() => setMode(m)}
+            >
+              {m}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div style={{ marginBottom: '0.9rem' }}>
+        <div style={{ color: 'var(--ent-text-dim)', fontSize: '0.8rem', marginBottom: '0.35rem' }}>
+          sidebar
+        </div>
+        <div style={{ display: 'flex', gap: '0.5rem' }}>
+          {(['left', 'right'] as SidebarSide[]).map((s) => (
+            <button
+              key={s}
+              type="button"
+              style={pillStyle(sidebar === s)}
+              onClick={() => setSidebar(s)}
+            >
+              {s}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div>
+        <div style={{ color: 'var(--ent-text-dim)', fontSize: '0.8rem', marginBottom: '0.35rem' }}>
+          panels
+        </div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+          {knownPanels.map((panel) => {
+            const visible = panels.includes(panel);
+            return (
+              <label
+                key={panel}
+                style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.9rem' }}
+              >
+                <input
+                  type="checkbox"
+                  checked={visible}
+                  disabled={!layout}
+                  onChange={(e) => togglePanel(panel, e.target.checked)}
+                />
+                <span style={{ fontFamily: 'var(--ent-mono)' }}>{panel}</span>
+                {visible && (
+                  <span className="debug__muted" style={{ fontSize: '0.75rem' }}>
+                    #{panels.indexOf(panel) + 1}
+                  </span>
+                )}
+              </label>
+            );
+          })}
         </div>
       </div>
     </section>
@@ -227,6 +360,8 @@ export function DebugView() {
             </tbody>
           </table>
         </section>
+
+        <LayoutCard />
 
         <PhoneCameraCard />
       </div>

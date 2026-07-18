@@ -94,6 +94,7 @@ class Hub:
         self._seq = 0
         self._latest_circuit: dict | None = None
         self._latest_detection: dict | None = None
+        self._latest_layout: dict | None = None
         self._last_detection_sent = 0.0
         self._camera: dict = {"kind": "none", "name": "", "connected": False}
         self._backend: dict = {"enabled": False, "healthy": False}
@@ -143,6 +144,8 @@ class Hub:
         if self._latest_detection is not None:
             await self._send(client, self._latest_detection)
         await self._send(client, self._status_message())
+        if self._latest_layout is not None:
+            await self._send(client, self._latest_layout)
         await self._broadcast(self._status_message(), exclude=client)
 
     async def disconnect(self, client: WSClient) -> None:
@@ -177,6 +180,18 @@ class Hub:
     async def publish_status(self) -> None:
         """Broadcast the current status to all clients (camera/backend change)."""
         await self._broadcast(self._status_message())
+
+    def set_layout(self, message: dict) -> None:
+        """Seed the latest ``layout`` message for replay (no broadcast).
+
+        Called at startup with the persisted layout so late joiners get it.
+        """
+        self._latest_layout = dict(message)
+
+    async def publish_layout(self, message: dict) -> None:
+        """Store the latest layout and broadcast it to all clients."""
+        self._latest_layout = dict(message)
+        await self._broadcast(self._latest_layout)
 
     # -- thread bridge -----------------------------------------------------
 

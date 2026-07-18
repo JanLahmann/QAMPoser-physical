@@ -71,6 +71,7 @@ def test_select_camera_push_swaps_to_the_shared_instance():
 
         with client.websocket_connect("/ws/state") as ws:
             ws.receive_json()  # initial status
+            ws.receive_json()  # replayed layout
             ws.send_json({"type": "select_camera", "kind": "push"})
             status = ws.receive_json()
             assert status["type"] == "status"
@@ -86,6 +87,7 @@ def test_select_camera_push_creates_source_when_no_frames_yet():
     with TestClient(app) as client:
         with client.websocket_connect("/ws/state") as ws:
             ws.receive_json()  # initial status
+            ws.receive_json()  # replayed layout
             ws.send_json({"type": "select_camera", "kind": "push"})
             ws.receive_json()  # status
         shared = app.state.push_source
