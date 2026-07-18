@@ -21,14 +21,18 @@ from qamposer_vision.markers import MARKER_TABLE, GateSpec
 from .build import build_double_tile, build_tile
 from .export import (
     double_slug,
+    export_double_batches,
     export_double_tile_3mf,
     export_double_tile_stls,
+    export_single_batches,
     export_tile_3mf,
     export_tile_stls,
     tile_slug,
+    write_batch_plates_md,
     write_double_plates_md,
     write_plates_md,
 )
+from .pack import parse_bed
 from .params import (
     DOUBLE_FACED_KIT,
     HardwareParams,
@@ -213,6 +217,63 @@ def _generate_double(
     return 0
 
 
+def _plates(
+    config: AssetsConfig,
+    *,
+    faces: str,
+    variant: str,
+    bed_text: str,
+    spacing: float,
+    out_root: Path,
+) -> int:
+    """Generate bed-ready multi-piece batch 3MFs + a Print jobs plates.md."""
+    bed = parse_bed(bed_text)
+    height = variant_height(variant, faces=faces)
+    subdir = f"{variant}-double" if faces == "double" else variant
+    vdir = out_root / subdir
+    vdir.mkdir(parents=True, exist_ok=True)
+    t0 = time.time()
+
+    print(
+        f"[{subdir}] bed {bed.width:g}x{bed.height:g} mm  spacing {spacing:g} mm  "
+        f"height {height:g} mm -> {vdir}"
+    )
+
+    if faces == "double":
+        base_md = write_double_plates_md(config, DOUBLE_FACED_KIT, vdir)
+        infos = export_double_batches(
+            config, DOUBLE_FACED_KIT, variant=variant, height=height,
+            bed=bed, spacing=spacing, out_dir=vdir,
+        )
+    else:
+        base_md = write_plates_md(config, vdir)
+        infos = export_single_batches(
+            config, variant=variant, height=height,
+            bed=bed, spacing=spacing, out_dir=vdir,
+        )
+
+    write_batch_plates_md(
+        base_md, infos, bed=bed, spacing=spacing, faces=faces, variant=variant
+    )
+
+    total_bytes = 0
+    for info in infos:
+        nbytes = info.path.stat().st_size
+        total_bytes += nbytes
+        print(
+            f"    {info.path.name:22s} plate{info.plate} batch{info.batch}  "
+            f"{len(info.slugs)} pieces  {info.object_count} objs  "
+            f"{nbytes/1024:7.1f} KiB"
+        )
+
+    dt = time.time() - t0
+    print(
+        f"\nDone: {len(infos)} batch 3MF(s) + plates.md, "
+        f"{total_bytes/1024/1024:.2f} MiB, {dt:.1f}s."
+    )
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         prog="qamposer-hardware",
@@ -242,6 +303,30 @@ def main(argv: list[str] | None = None) -> int:
         help=f"output root (default: {_DEFAULT_OUT})",
     )
 
+    plates = sub.add_parser(
+        "plates", help="generate bed-ready multi-piece batch 3MFs + plates.md"
+    )
+    plates.add_argument(
+        "--faces", default="single", choices=("single", "double"),
+        help="single-faced tiles (default) | double-faced flip pieces",
+    )
+    plates.add_argument(
+        "--variant", default="tile", choices=("tile", "cube"),
+        help="tile (default) | cube (60 mm, tall print)",
+    )
+    plates.add_argument(
+        "--bed", default="250x220",
+        help="print bed WIDTHxHEIGHT in mm (default: 250x220, Prusa Core One)",
+    )
+    plates.add_argument(
+        "--spacing", default=8.0, type=float,
+        help="gap between pieces in mm (default: 8)",
+    )
+    plates.add_argument(
+        "--out", default=str(_DEFAULT_OUT), type=Path,
+        help=f"output root (default: {_DEFAULT_OUT})",
+    )
+
     args = parser.parse_args(argv)
     if args.command == "generate":
         config = load_config()
@@ -252,6 +337,16 @@ def main(argv: list[str] | None = None) -> int:
         ids = _resolve_gates(args.gates)
         return _generate(
             config, variants, ids, args.out, magnets=args.magnets
+        )
+    if args.command == "plates":
+        config = load_config()
+        return _plates(
+            config,
+            faces=args.faces,
+            variant=args.variant,
+            bed_text=args.bed,
+            spacing=args.spacing,
+            out_root=args.out,
         )
     parser.error("unknown command")
     return 2

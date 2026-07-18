@@ -92,6 +92,30 @@ set uses **4** accent colours, so tiles split across **2 plates**:
 Hex values are read from `assets.toml` — they are exactly `@qamposer/react`'s
 `GATE_COLORS`, so a tile in hand matches its gate on screen.
 
+### Bed-ready print plates
+
+`generate` writes one file **per piece**; `plates` instead writes one 3MF **per
+physical print job** — a whole bed of pieces arranged and ready to slice:
+
+```bash
+uv run qamposer-hardware plates --faces single --variant tile   # single kit
+uv run qamposer-hardware plates --faces double --variant tile   # double kit
+uv run qamposer-hardware plates --bed 300x300 --spacing 6       # custom bed/gap
+```
+
+Options: `--faces single|double`, `--variant tile|cube`, `--bed WIDTHxHEIGHT`
+(default `250x220`, Prusa Core One), `--spacing` mm (default `8`), `--out DIR`.
+
+It reuses the same filament-plate groupings above, then **packs** each plate onto
+the bed: 60 × 60 mm footprints on a grid with `--spacing` gaps, row-major and
+centred — `250 × 220` fits **3 × 3 = 9** pieces. A plate with more pieces than one
+bed holds is split into numbered batches: `plate1-batch1.3mf`, `plate1-batch2.3mf`,
+… Each batch 3MF holds **all** its pieces as separate colour objects at their bed
+positions (colours identical to the per-piece 3MFs, so it opens colour-correct in
+PrusaSlicer). `plates.md` gains a **Print jobs** section listing every batch file,
+its pieces, and a tiny ASCII bed sketch. Cubes pack the same 3 × 3 but are a tall,
+long print.
+
 ## Double-faced pieces
 
 A **double-faced** piece carries a gate on *both* sides: face A on top, face B on

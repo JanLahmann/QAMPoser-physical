@@ -8,14 +8,22 @@ which slicers open directly as a multi-material object.
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from pathlib import Path
 
-from build123d import Mesher, export_stl
+from build123d import Mesher, Pos, export_stl
 from qamposer_assets.config import AssetsConfig
 from qamposer_vision.markers import MARKER_TABLE, GateSpec, pretty_angle
 
-from .build import DoubleTileParts, TileParts
+from .build import (
+    DoubleTileParts,
+    TileParts,
+    build_double_tile,
+    build_tile,
+)
 from .face import accent_color_name, double_color_name
+from .pack import FOOTPRINT, Bed, plan_batches
+from .params import HardwareParams
 
 __all__ = [
     "tile_slug",
@@ -27,6 +35,12 @@ __all__ = [
     "write_plates_md",
     "double_plate_assignment",
     "write_double_plates_md",
+    "single_plate_groups",
+    "double_plate_groups",
+    "BatchInfo",
+    "export_single_batches",
+    "export_double_batches",
+    "write_batch_plates_md",
 ]
 
 #: Named filament slots that are constant across every plate.
@@ -374,3 +388,298 @@ def write_double_plates_md(
     path = out_dir / "plates.md"
     path.write_text("\n".join(lines), encoding="utf-8")
     return path
+
+
+# --------------------------------------------------------------------------- #
+# Bed-ready print batches — multi-piece coloured 3MFs, one per physical job
+# --------------------------------------------------------------------------- #
+
+
+@dataclass(slots=True)
+class _ColoredPart:
+    """One coloured solid ready to translate onto the bed: (hex, name, solid)."""
+
+    hex: str
+    name: str
+    solid: object  # build123d Solid
+
+
+@dataclass(slots=True)
+class _Piece:
+    """A single physical piece: its filename slug and its coloured parts."""
+
+    slug: str
+    parts: list[_ColoredPart]
+
+
+@dataclass(slots=True)
+class BatchInfo:
+    """Metadata for one written batch 3MF (a single physical print job)."""
+
+    plate: int
+    batch: int
+    path: Path
+    slugs: list[str]  # piece slug per placed piece, row-major
+    positions: list[tuple[float, float]]  # bed centre point per piece
+    object_count: int  # coloured objects in the 3MF
+    cols: int
+    rows: int
+
+
+def single_plate_groups(config: AssetsConfig) -> list[dict]:
+    """Filament plates for the single kit, as ``{"accents": [hex], "pieces": [mid]}``.
+
+    Same membership rule as :func:`write_plates_md`: white + black + ≤3 accent
+    families per plate, accents chunked in table order, tiles grouped by accent.
+    """
+    by_accent: dict[str, list[int]] = {}
+    accent_order: list[str] = []
+    for mid, spec in _gate_tiles():
+        hexc = config.colors.for_gate(spec.gate)
+        if hexc not in by_accent:
+            by_accent[hexc] = []
+            accent_order.append(hexc)
+        by_accent[hexc].append(mid)
+
+    free_slots = 3
+    plates: list[dict] = []
+    for i in range(0, len(accent_order), free_slots):
+        chunk = accent_order[i : i + free_slots]
+        pieces = [mid for hexc in chunk for mid in by_accent[hexc]]
+        plates.append({"accents": chunk, "pieces": pieces})
+    return plates
+
+
+def double_plate_groups(
+    config: AssetsConfig, kit: list[tuple[int, int | None, int]]
+) -> list[dict]:
+    """Filament plates for the double kit with quantities expanded to pieces.
+
+    Wraps :func:`double_plate_assignment` and flattens each ``(a, b, qty)`` into
+    ``qty`` copies of ``(a, b)`` — one physical piece each.
+    """
+    plates = double_plate_assignment(config, kit)
+    out: list[dict] = []
+    for plate in plates:
+        pieces = [(a, b) for a, b, qty in plate["pieces"] for _ in range(qty)]
+        out.append({"families": plate["families"], "pieces": pieces})
+    return out
+
+
+def _single_piece(
+    mid: int, config: AssetsConfig, variant: str, height: float, params: HardwareParams
+) -> _Piece:
+    parts = build_tile(mid, config, variant=variant, height=height, params=params)
+    slug = tile_slug(parts.layout.spec)
+    cp = [
+        _ColoredPart(_part_color_hex(role, parts.layout), f"{slug}-{role}-{cn}", solid)
+        for role, cn, solid in parts.named_parts()
+    ]
+    return _Piece(slug, cp)
+
+
+def _double_piece(
+    a: int,
+    b: int | None,
+    config: AssetsConfig,
+    variant: str,
+    height: float,
+    params: HardwareParams,
+) -> _Piece:
+    parts = build_double_tile(a, b, config, variant=variant, height=height, params=params)
+    mb = a if b is None else b
+    slug = double_slug(MARKER_TABLE[a], MARKER_TABLE[mb])
+    cp = [
+        _ColoredPart(hexc, f"{slug}-{role}-{cn}", solid)
+        for role, cn, hexc, solid in parts.named_parts()
+    ]
+    return _Piece(slug, cp)
+
+
+def _write_batch_3mf(
+    pieces: list[_Piece],
+    positions: list[tuple[float, float]],
+    path: Path,
+    footprint: float = FOOTPRINT,
+) -> int:
+    """Write one batch: every piece's coloured parts translated onto the bed.
+
+    Each piece is built with its footprint in the first quadrant (centre at
+    ``footprint/2``); it is translated so that centre lands on its bed position.
+    Per-part colours are preserved exactly as in the per-piece 3MFs. Returns the
+    number of coloured objects written.
+    """
+    mesher = Mesher()
+    n_obj = 0
+    for piece, (cx, cy) in zip(pieces, positions):
+        dx = cx - footprint / 2.0
+        dy = cy - footprint / 2.0
+        for part in piece.parts:
+            mesher.add_shape(Pos(dx, dy, 0.0) * part.solid)
+            _apply_object_color(mesher, part.hex, part.name)
+            n_obj += 1
+    mesher.write(str(path))
+    return n_obj
+
+
+def _cols_rows(bed: Bed, spacing: float) -> tuple[int, int]:
+    from .pack import bed_capacity
+
+    return bed_capacity(bed, FOOTPRINT, spacing)
+
+
+def _export_batches(
+    build_pieces,
+    plate_pieces: list[list],
+    bed: Bed,
+    spacing: float,
+    out_dir: Path,
+) -> list[BatchInfo]:
+    """Shared driver: build each filament plate's pieces, pack, write batch 3MFs."""
+    out_dir.mkdir(parents=True, exist_ok=True)
+    cols, rows = _cols_rows(bed, spacing)
+    infos: list[BatchInfo] = []
+    for pi, members in enumerate(plate_pieces, start=1):
+        pieces = [build_pieces(m) for m in members]
+        batches = plan_batches(len(pieces), bed, FOOTPRINT, spacing)
+        idx = 0
+        for bi, positions in enumerate(batches, start=1):
+            take = len(positions)
+            batch = pieces[idx : idx + take]
+            idx += take
+            path = out_dir / f"plate{pi}-batch{bi}.3mf"
+            n_obj = _write_batch_3mf(batch, positions, path)
+            infos.append(
+                BatchInfo(
+                    plate=pi,
+                    batch=bi,
+                    path=path,
+                    slugs=[p.slug for p in batch],
+                    positions=positions,
+                    object_count=n_obj,
+                    cols=cols,
+                    rows=rows,
+                )
+            )
+    return infos
+
+
+def export_single_batches(
+    config: AssetsConfig,
+    *,
+    variant: str,
+    height: float,
+    bed: Bed,
+    spacing: float,
+    out_dir: Path,
+    params: HardwareParams | None = None,
+) -> list[BatchInfo]:
+    """Write bed-ready batch 3MFs for the single-faced kit."""
+    params = params or HardwareParams()
+    groups = single_plate_groups(config)
+    return _export_batches(
+        lambda mid: _single_piece(mid, config, variant, height, params),
+        [g["pieces"] for g in groups],
+        bed,
+        spacing,
+        out_dir,
+    )
+
+
+def export_double_batches(
+    config: AssetsConfig,
+    kit: list[tuple[int, int | None, int]],
+    *,
+    variant: str,
+    height: float,
+    bed: Bed,
+    spacing: float,
+    out_dir: Path,
+    params: HardwareParams | None = None,
+) -> list[BatchInfo]:
+    """Write bed-ready batch 3MFs for the double-faced kit."""
+    params = params or HardwareParams()
+    groups = double_plate_groups(config, kit)
+    return _export_batches(
+        lambda ab: _double_piece(ab[0], ab[1], config, variant, height, params),
+        [g["pieces"] for g in groups],
+        bed,
+        spacing,
+        out_dir,
+    )
+
+
+def _ascii_layout(info: BatchInfo, cell_w: int = 8) -> list[str]:
+    """A tiny boxed grid of the batch's piece slugs, row-major."""
+    cols = max(info.cols, 1)
+    n = len(info.slugs)
+    rule = "+" + ("-" * cell_w + "+") * cols
+
+    def cell(text: str) -> str:
+        return text[:cell_w].ljust(cell_w)
+
+    lines: list[str] = ["```", rule]
+    for r in range((n + cols - 1) // cols):
+        row_slugs = info.slugs[r * cols : (r + 1) * cols]
+        row = "|" + "|".join(cell(s) for s in row_slugs) + "|"
+        lines.append(row)
+        lines.append(rule)
+    lines.append("```")
+    return lines
+
+
+def write_batch_plates_md(
+    base_md: Path,
+    infos: list[BatchInfo],
+    *,
+    bed: Bed,
+    spacing: float,
+    faces: str,
+    variant: str,
+) -> Path:
+    """Append a **Print jobs** section (batch files + ASCII layouts) to ``base_md``.
+
+    ``base_md`` is the plate-grouping ``plates.md`` already written by
+    :func:`write_plates_md` / :func:`write_double_plates_md`; this adds one entry
+    per batch 3MF. Returns ``base_md``.
+    """
+    cols = infos[0].cols if infos else 0
+    rows = infos[0].rows if infos else 0
+    total_pieces = sum(len(i.slugs) for i in infos)
+    lines: list[str] = [
+        "",
+        "---",
+        "",
+        "## Print jobs",
+        "",
+        f"Bed **{bed.width:g} × {bed.height:g} mm**, piece footprint "
+        f"**{FOOTPRINT:g} × {FOOTPRINT:g} mm** + **{spacing:g} mm** spacing → "
+        f"**{cols} × {rows} = {cols * rows}** pieces per bed. Each filament plate "
+        "above is split into numbered **batches**; every batch below is one "
+        "multi-piece coloured 3MF (open it, print the whole bed on that plate's "
+        f"filaments). {len(infos)} batch file(s), {total_pieces} pieces total.",
+        "",
+    ]
+    if variant == "cube":
+        lines.append(
+            "> **Cube kit:** pieces are 60 mm tall — a tall, long print. "
+            "Same 3 × 3 bed packing; expect a long job and watch bed adhesion."
+        )
+        lines.append("")
+
+    for info in infos:
+        lines.append(
+            f"### `{info.path.name}` — plate {info.plate}, batch {info.batch}"
+        )
+        lines.append("")
+        lines.append(
+            f"{len(info.slugs)} piece(s), {info.object_count} coloured objects: "
+            + ", ".join(f"`{s}`" for s in info.slugs)
+        )
+        lines.append("")
+        lines.extend(_ascii_layout(info))
+        lines.append("")
+
+    with base_md.open("a", encoding="utf-8") as fh:
+        fh.write("\n".join(lines))
+    return base_md
