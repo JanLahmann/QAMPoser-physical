@@ -149,11 +149,14 @@ Compare against canonical states up to global phase, fidelity ≥ 0.99.
 
 ## Variant-A refinements (Jan, 2026-07-18)
 
-- **Vertical bit-stack labels**: histogram outcome labels render their bits
-  stacked vertically, top bit = q0 — mirroring the wire order on the stage.
-  A small `q0…q4` guide column sits left of the labels. ≤8 outcomes: full
-  stacks per row. More: sorted top rows with stacks + aggregated tail;
-  uniform superposition: pattern block + "2^k equally likely" callout.
+- **Vertical bit-stack labels** (supersedes the row-histogram): outcome labels
+  render bits stacked vertically, top bit = q0 — mirroring wire order. This
+  makes **column bars** the coherent chart form again: each column's stack
+  sits beneath its bar, all bits align horizontally, and a `q0…q4` mono guide
+  column at the left names the rows — the label area reads as a bit-matrix.
+  ≤8 outcomes: all columns, legible stacks. More: sorted top-6 columns +
+  aggregated-tail note; uniform superposition: micro-column pattern block +
+  "2^k equally likely" callout.
 - **Touch (optional, config `--touch` / auto via `pointer: coarse`)**: touch
   never edits the circuit (the table is the editor). Touch = *inspect*: tap a
   gate → one-sentence info popover ("H puts q0 in superposition"); tap an
