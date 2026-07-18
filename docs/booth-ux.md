@@ -18,30 +18,105 @@
 5. **Pi-friendly motion**: CSS transforms/opacity + one canvas only; no blur
    filters; ≤ 150 confetti particles (`?lowpower` caps at 60, for Pi 4).
 
-## Layout (16:9, dark `#161616`, IBM Plex Sans)
+## Design system (v2 — exhibit grade, traQmania-derived)
+
+> v2 (2026-07-18): Jan asked for a more professional, high-end look, in the
+> spirit of traQmania's exhibit UI (`~/GitHub/traQmania/traqmania/web/`, a
+> Fable-designed layout). We adopt its layered-surface system, scaled for 3 m.
+
+**Design lineage** — three references, one synthesis:
+
+| Reference | Concept | What we take | What we reject |
+|---|---|---|---|
+| IBM Quantum Composer | IDE workbench for a seated user: gate palette, circuit canvas, docked live panels (probabilities/Q-sphere), synced QASM pane | the *"circuit and its consequences at once"* dock; the **live synced QASM pane** (its signature); Carbon color/type discipline | palettes, toolbars, anything drag/clickable — input is the table |
+| QAMPoser frontend | same workbench, literally `@carbon/react` g100 (operations \| circuit / probabilities \| Q-sphere / code column) | family identity: g100-adjacent darks, Plex, gate colors — booth must read as QAMPoser's sibling | the 50 cm information density |
+| traQmania | exhibit UI for standing spectators: stage + stacked sidebar panels, pills, small-caps labels, layered surfaces | the whole spatial system: stage-first hierarchy, surface layering, pills, quiet chrome | its 14 px desktop scale (we scale ~1.4×) |
+
+Checked against the **live IBM Composer** (quantum.cloud.ibm.com/composer,
+screenshot 2026-07-18): near-black surfaces + hairline dividers, zero
+decoration; quiet panel headers (plain title + caret + small icons);
+syntax-colored synced QASM pane; probability bars in light cyan; exactly ONE
+saturated primary button per screen ("Set up and run"). Adoptions below:
+histogram bars go **cyan `#4589ff`→`#33b1ff` family** (not `--accent` blue);
+the QASM pane gets IBM-style syntax tint (keywords cyan, literals magenta);
+and the noisy-Run control, when a backend is present, is styled as the
+booth's single primary blue button — it *is* our "Set up and run".
+
+In one line: **a spectator surface with traQmania's bones, wearing the
+composer family's skin, at 3 m scale.**
+
+**Surface tokens** (replace flat `#161616`):
+
+```css
+--bg:        #0f1117;   /* page */
+--bg-panel:  #161a22;   /* panels, top bar */
+--bg-inset:  #11141b;   /* wells inside panels (histogram plot area, QASM) */
+--border:    #262b36;   /* hairline 1px — the ONLY separator; no shadows */
+--text:      #e6e9ef;
+--muted:     #8a91a0;
+--accent:    #0f62fe;   /* Carbon blue: bars, active states */
+--entangle:  #7a5cff;   /* quantum purple: brand accent + entanglement moments */
+--ok:        #2fbf71;  --warn: #f1c21b;  --danger: #e5484d;
+```
+
+Gate colors stay the Carbon/`@qamposer/react` set (tiles ⇄ screen identity).
+Radius 8 px (booth scale of traQmania's 6). No gradients, no shadows, no blur —
+depth comes from the three surface levels + hairline borders only.
+
+**Type**: IBM Plex Sans; base 20 px @1080p. Section labels are traQmania-style
+small caps: 15 px, `letter-spacing 0.08em`, weight 600, `--muted`, uppercase
+("RESULTS", "STATE"). Numbers in IBM Plex Mono.
+
+## Layout (stage + sidebar, 16:9)
 
 ```
-┌────────────────────────────────────────────────────────────┐
-│ Entangible ●connected                          [72px bar]  │  header, muted
-├──────────────────────────────────┬─────────────────────────┤
-│                                  │                         │
-│   circuit (controlled Qamposer)  │  histogram (localAdapter│
-│   ~62% width, gates scaled up    │  realtime), bars in     │
-│                                  │  Carbon blue            │
-│                                  ├─────────────────────────┤
-│                                  │  message strip (see ↓)  │
-├──────────────────────────────────┴─────────────────────────┤
-│ hint ticker: "● and ⊕ in the same column make a CNOT…"     │  40px, muted
-└────────────────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────────┐
+│ En̲tangible      ⬤ camera  ⬤ live  2 viewers      [56px bar] │ topbar, panel bg
+├───────────────────────────────────────────┬──────────────────┤
+│                                           │ RESULTS          │
+│   STAGE — the circuit, full bleed         │ ┌──────────────┐ │
+│   (controlled editor on --bg, generous    │ │ histogram in │ │
+│    padding; wires + gates are the hero)   │ │ inset well   │ │
+│                                           │ └──────────────┘ │
+│   ── celebration banner + confetti are    │ STATE            │
+│      STAGE OVERLAYS, not layout items ──  │  qubits touched…│ │
+│                                           │ stat rows        │
+│   ▁ message strip: overlay, bottom-left ▁ │ (Q-sphere panel  │
+│                                           │  post-upstream)  │
+├───────────────────────────────────────────┴──────────────────┤
+│ hint ticker (muted) / warnings (amber)             [44px bar] │
+└──────────────────────────────────────────────────────────────┘
 ```
 
-- Header: wordmark 28 px, connection dot 12 px (green `#42be65` / amber pulse
-  while reconnecting). Nothing else.
-- **Message strip** is the voice of the app (see Moments) — 32 px, one line,
-  never two messages at once, 300 ms fade between.
-- Warnings replace the hint ticker (not the message strip), amber `#f1c21b`
-  text, friendly wording ("A ● tile is waiting for its ⊕ partner in column 3"),
-  disappear with the cause.
+- **Topbar** (`--bg-panel`, bottom hairline): wordmark 30 px — "En" in
+  `--entangle` purple, "tangible" in `--text` (the pun, typeset); right side:
+  status **pills** (traQmania-style: 999px radius, `--bg-inset`, hairline
+  border, 8 px dot + label): camera kind, connection (green/amber pulse),
+  viewer count. Pills are 3 m-legible but visually quiet.
+- **Stage** (left, fluid): the circuit editor sits directly on `--bg` with
+  generous padding — no panel box around the hero. Celebration banner +
+  confetti render as absolutely-positioned stage overlays. **Message strip** is
+  a bottom-left stage overlay in a subtle `--bg-panel` pill, 34 px text, one
+  line, 300 ms fade, min 4 s dwell.
+- **Sidebar** (right, 400 px @1080p ≈ 21%, `--bg-panel`, left hairline):
+  stacked sections with small-caps labels. RESULTS: histogram bars in
+  `--accent` on an inset well, axis labels Plex Mono `--muted`; reserve the
+  slot where the Q-sphere panel lands post-upstream. STATE: stat rows
+  (label `--muted` left / value Plex Mono right): qubits touched, gates,
+  columns used. OPENQASM: the composer's signature — a compact live QASM pane
+  (inset well, Plex Mono 17 px, last ~7 lines, gate lines tinted with their
+  gate color at 60%, silent autoscroll). It syncs with every tile placed —
+  visitors who know the IBM Composer recognize it instantly, and it
+  photographs well. Bottom of sidebar: small "scan to learn more" QR
+  when idle (optional, config-gated).
+- **Footer** (`--bg-panel`, top hairline): hint ticker in `--muted`; warnings
+  replace it in `--warn` amber with a leading ⚠ glyph, friendly wording
+  ("A ● tile is waiting for its ⊕ partner in column 3"), gone with the cause.
+- **Celebration banners** restyle to match: Bell = "ENTANGLEMENT!" in
+  `--entangle` purple (not red — purple is the entanglement color across the
+  system), GHZ = purple with count; confetti keeps the four gate colors.
+- Attract mode inherits the surfaces (dim to 30%, same tokens), and its call
+  to action uses the purple accent.
 
 ## Moments (message strip + celebrations)
 
