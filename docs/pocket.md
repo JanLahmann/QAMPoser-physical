@@ -108,24 +108,19 @@ Serverless equivalents of the booth's /debug controls — all local
   strokes vs par) + confetti; clearing the board advances to the next hole.
   Animated state evolution deliberately absent (that's qsphere-evolution).
 
-## Qubit count: 3 by default, 5 on demand (per Jan, 2026-07-18)
+## Wire display: compact by default (revised per Jan, 2026-07-18)
 
-- Setting `qubits: 3 | 5` (segmented control in the drawer; URL `?qubits=5`),
-  **default 3** on first run; persisted choice wins. Simpler first contact:
-  3 wires, ≤8 outcomes, less visual noise — full power one toggle away.
-- Active rows = the TOP `qubits` rows of the unchanged physical mat. Tiles
-  detected on sleeping rows are excluded with a friendly warning ("q3 and q4
-  are asleep — wake them in settings (5 qubits)"), warning code
-  `row_out_of_range`.
-- Everything derives from the count: `circuit.qubits`, editor wires, QASM
-  `qreg q[N]`, histogram outcome space (uniform case at 3 qubits = 8 normal
-  columns — no micro mode needed), moments' "every row carries an H" rule,
-  and golf (holes with k ≤ N; a muted scorecard row invites switching to 5
-  for holes 4–5).
-- `display-app/src/quantum/statevector.ts` generalizes from the fixed
-  NUM_QUBITS=5 to `circuit.qubits`-driven dimensions (booth keeps passing 5 —
-  behavior there unchanged until the booth gains its own setting, tracked
-  separately).
+**Display-only** — the physical table is always 5 qubits; detection, circuit
+JSON (`qubits: 5`), QASM (`qreg q[5]`), moments, and golf are untouched.
+
+- Setting `wires: compact | all` (drawer: "Wires: auto | all 5"; URL
+  `?wires=all`), default **compact**: the editor shows
+  `max(3, highest used row + 1)` wires — 3 on an empty board, auto-expanding
+  the moment a tile lands on q3/q4 (real tiles are never hidden), contracting
+  when removed (stabilizer keeps this non-flickery). `all` pins 5.
+- Implemented as a pure display transform (`{qubits: D, gates}` fed to the
+  controlled editor). The histogram needs nothing — it already reduces to
+  active qubits.
 
 ## Deployment
 
