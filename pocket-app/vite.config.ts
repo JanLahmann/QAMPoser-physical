@@ -20,8 +20,11 @@ export default defineConfig({
   },
   server: {
     fs: {
-      // Allow importing display-app/src/quantum/* (outside the app root).
-      allow: [here, resolve(here, '../display-app')],
+      // Allow importing display-app/src/quantum/* and the bundled Guide assets
+      // (test-board PNGs + print kit PDF in ../examples) — both outside the app
+      // root. Assets are processed and hashed into dist, so the deploy stays
+      // self-contained.
+      allow: [here, resolve(here, '../display-app'), resolve(here, '../examples')],
     },
   },
   build: {

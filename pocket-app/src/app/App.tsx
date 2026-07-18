@@ -29,6 +29,8 @@ import { QSphere2D } from './QSphere2D';
 import { Scorecard } from './Scorecard';
 import { DebugPanel } from './DebugPanel';
 import { SettingsControl } from './SettingsDrawer';
+import { GuidePage } from './GuidePage';
+import { useRoute } from './hashNav';
 import { useSettings, type PanelId } from './settings';
 import {
   golfStep,
@@ -143,6 +145,7 @@ function drawOverlay(
 
 export function App() {
   const settings = useSettings();
+  const route = useRoute();
   const [circuit, setCircuit] = useState<Circuit>(() => createDefaultCircuit(BOARD_QUBITS));
   const [warnings, setWarnings] = useState<BuildWarning[]>([]);
   const [corners, setCorners] = useState(0);
@@ -316,6 +319,9 @@ export function App() {
           <span className="pk-dot" aria-hidden="true" />
           {camPill.label}
         </span>
+        <a className="pk-help" href="#guide" aria-label="Guide and about" title="Guide & about">
+          ?
+        </a>
         <SettingsControl />
         {running ? (
           <button className="pk-btn is-stop" onClick={camera.stop}>
@@ -360,6 +366,10 @@ export function App() {
         celebration={celebration}
         maxParticles={settings.lowpower ? LOW_POWER_PARTICLES : undefined}
       />
+
+      {/* The Guide renders as an overlay over the still-mounted app, so an active
+          camera stream keeps running while it is open (docs/pocket.md). */}
+      {route === 'guide' && <GuidePage />}
     </div>
   );
 }
@@ -476,6 +486,9 @@ function CameraPanel({
             <button className="pk-btn" onClick={start} disabled={status === 'starting'}>
               {status === 'starting' ? 'Starting…' : 'Start camera'}
             </button>
+            <a className="pk-startcard-link" href="#guide">
+              New here? Read the guide
+            </a>
           </div>
         </div>
       )}

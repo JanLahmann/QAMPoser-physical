@@ -174,6 +174,15 @@ export function SettingsControl() {
                   onChange={(debug) => settingsStore.update({ debug })}
                 />
               </section>
+
+              <section className="pk-drawer-sec">
+                <a className="pk-drawer-row" href="#guide" onClick={close}>
+                  <span>Guide &amp; about</span>
+                  <span aria-hidden="true" className="pk-drawer-row-chevron">
+                    →
+                  </span>
+                </a>
+              </section>
             </div>
           </aside>
         </div>
