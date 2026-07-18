@@ -81,6 +81,10 @@ tests/                    # fixtures (golden circuits, synthetic + real images, 
 5. **M5 – RasQberry packaging**: install script, launcher, systemd + kiosk, perf validation on Pi 4/5, `docs/rasqberry.md`.
 6. **M6 (stretch)**: STL/3MF tiles from shared SVG faces; marker-less symbol-recognition mode; S/T/SWAP tiles from reserved IDs.
 
+### Idea (unscheduled): standalone browser mode — runs on an iPhone
+
+A zero-install variant of the whole loop as a single static HTTPS page (e.g. hosted on qamposer.org): camera via `getUserMedia`, ArUco detection in the browser (OpenCV.js/WASM or js-aruco2), circuit building in TS, display + `localAdapter` simulation as in the main display app. Runs on anything with a camera and a modern browser — notably an iPhone pointed at the tiles becomes a complete "pocket demo" (recent iPhones are far faster than the Pi 4 perf budget; hosting on a real domain also sidesteps the self-signed-cert story). Shares `MARKER_TABLE`, `assets.toml` geometry, and the printed tiles/mat with the main system; the TS circuit-builder port is validated against the Python golden fixtures. Deliberately *not* the primary architecture: it can't reach the Pi CSI camera (libcamera isn't visible to `getUserMedia`), and a phone screen can't replace the 3 m booth display (AirPlay mirroring reintroduces a second device; a kiosk Pi is more robust all-day). Positioning: an extra deployment target/marketing demo alongside M6, after the marker scheme and assets are stable (post-M1) and ideally reusing M3's display components.
+
 ## Risks & mitigations (top)
 
 - **Pi 4 fps**: 720p + 4×4 dict; optional half-res detect; realtime sim offloaded to browser; perf harness on ReplaySource at M2.
