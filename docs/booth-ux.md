@@ -149,14 +149,15 @@ Compare against canonical states up to global phase, fidelity ≥ 0.99.
 
 ## Variant-A refinements (Jan, 2026-07-18)
 
-- **Vertical histogram with vertical labels** (confirmed by Jan — rows, not
-  columns): outcomes stack vertically as rows, bars grow horizontally; each
-  row's label is its bit-string written **vertically** (top bit = q0,
-  mirroring wire order), so a row label is k bits tall. A faint `q0…` guide
-  sits beside the first row's stack only (one-time legend; all rows share the
-  layout). ≤8 outcomes: all rows. More: sorted top-6 rows + aggregated-tail
-  note; uniform superposition: label-less micro-row pattern block + "2^k
-  equally likely" callout.
+- **Histogram form (final, Jan 2026-07-18): column bars + vertical bit-stack
+  labels + zero-states hidden.** Bars stand vertically side by side; each
+  column's label is its bit-string stacked vertically beneath it (top bit =
+  q0, mirroring wire order), with a faint `q0…` guide column at the left.
+  **Basis states with probability 0 are hidden** — this is what makes columns
+  scale: Bell/GHZ show 2 columns, shallow circuits show few. When > 8 nonzero
+  outcomes: sorted top-6 columns + aggregated-tail note; uniform
+  superposition (all 2^k nonzero and equal): micro-column pattern block +
+  "2^k equally likely" callout.
 - **Touch (optional, config `--touch` / auto via `pointer: coarse`)**: touch
   never edits the circuit (the table is the editor). Touch = *inspect*: tap a
   gate → one-sentence info popover ("H puts q0 in superposition"); tap an

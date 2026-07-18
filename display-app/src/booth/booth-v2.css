@@ -183,34 +183,62 @@
   padding: 1.3vh;
 }
 
-/* ---- RESULTS: vertical histogram — outcome rows, horizontal bars,
-        vertical bit-stack labels (top bit = q0) ------------------------- */
+/* ---- RESULTS: column bars + vertical bit-stack labels, zero states
+        hidden (top bit = q0; q-guide column at the left) ---------------- */
 
 .bo-h-plot {
   display: flex;
-  flex-direction: column;
-  gap: 1vh;
+  gap: 1.4vh;
+  align-items: flex-end;
+  height: 19vh;
 }
 
 .bo-h-plot.is-micro {
-  gap: 0.28vh;
-}
-
-.bo-h-row {
-  display: flex;
-  align-items: center;
-  gap: 1vh;
+  gap: 0.3vh;
 }
 
 .bo-h-guide {
   display: flex;
   flex-direction: column;
   align-items: flex-end;
+  justify-content: flex-end;
   line-height: 1.4;
-  font-size: 1.1vh;
+  font-size: 1.15vh;
   color: var(--faint);
-  width: 2.6vh;
   flex: none;
+  height: 100%;
+}
+
+.bo-h-col {
+  flex: 1;
+  min-width: 0;
+  max-width: 7vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.6vh;
+  height: 100%;
+}
+
+.bo-h-pct {
+  font-size: 1.25vh;
+  color: var(--muted);
+  height: 1.6vh;
+  line-height: 1.6vh;
+}
+
+.bo-h-bar {
+  width: 100%;
+  background: var(--bars);
+  border-radius: 3px 3px 0 0;
+  transition: height 0.3s ease;
+  min-height: 2px;
+}
+
+.is-micro .bo-h-bar {
+  background: #1c6ea0;
+  border-radius: 1px 1px 0 0;
 }
 
 .bo-h-stack {
@@ -220,49 +248,6 @@
   line-height: 1.4;
   font-size: 1.35vh;
   color: var(--muted);
-  width: 1.6vh;
-  flex: none;
-}
-
-.bo-h-track {
-  flex: 1;
-  align-self: stretch;
-  display: flex;
-  align-items: center;
-  background: var(--bg);
-  border-radius: 3px;
-  overflow: hidden;
-  min-height: 1.6vh;
-}
-
-.bo-h-fill {
-  height: 62%;
-  min-height: 1.4vh;
-  background: var(--bars);
-  border-radius: 0 3px 3px 0;
-  transition: width 0.3s ease;
-}
-
-.bo-h-fill.is-dim {
-  background: #1c3f57;
-}
-
-.is-micro .bo-h-track {
-  min-height: 0.55vh;
-}
-
-.is-micro .bo-h-fill {
-  height: 100%;
-  min-height: 0.45vh;
-  background: #1c6ea0;
-}
-
-.bo-h-pct {
-  font-size: 1.25vh;
-  color: var(--muted);
-  width: 3.4vh;
-  flex: none;
-  text-align: right;
 }
 
 .bo-h-tail,
