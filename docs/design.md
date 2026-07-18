@@ -91,6 +91,22 @@ tests/                    # fixtures (golden circuits, synthetic + real images, 
 
 A zero-install variant of the whole loop as a single static HTTPS page (e.g. hosted on qamposer.org): camera via `getUserMedia`, ArUco detection in the browser (OpenCV.js/WASM or js-aruco2), circuit building in TS, display + `localAdapter` simulation as in the main display app. Runs on anything with a camera and a modern browser — notably an iPhone pointed at the tiles becomes a complete "pocket demo" (recent iPhones are far faster than the Pi 4 perf budget; hosting on a real domain also sidesteps the self-signed-cert story). Shares `MARKER_TABLE`, `assets.toml` geometry, and the printed tiles/mat with the main system; the TS circuit-builder port is validated against the Python golden fixtures. Deliberately *not* the primary architecture: it can't reach the Pi CSI camera (libcamera isn't visible to `getUserMedia`), and a phone screen can't replace the 3 m booth display (AirPlay mirroring reintroduces a second device; a kiosk Pi is more robust all-day). Positioning: an extra deployment target/marketing demo alongside M6, after the marker scheme and assets are stable (post-M1) and ideally reusing M3's display components.
 
+### Dial tiles — IN BUILD (per Jan 2026-07-18, software side first)
+
+Three NEW tiles, coexisting with the normal rotation tiles: marker IDs
+**42 = RX-dial, 43 = RY-dial, 44 = RZ-dial** (from the reserved range;
+RESERVED shrinks to 45–49). The tile's orientation ON THE BOARD selects the
+angle. Conventions: orientation is measured in the board frame (rectified via
+the homography, not the camera frame); rotation index r = clockwise 90° steps
+from canonical; **angle = ROTATION_ANGLES[r]** (π/4, π/2, π, −π/2). Face
+design: marker centered, the four angle labels on the four edges placed so the
+ACTIVE angle always reads upright at the top edge (board-top), with a small ▲
+pointer; family colors (RX/RY magenta, RZ light blue) as a full frame.
+Stabilizer/pipelines: for dial IDs the stability key includes the rotation —
+turning a tile in place must re-emit the circuit (with hysteresis, like any
+change). Emission stays `RZ/RX/RY(parameter)` — indistinguishable downstream
+from the classic tiles. 3D/dial hardware follows later.
+
 ### Idea (unscheduled): rotation-as-dial tiles
 
 Per Jan's question 2026-07-18: detection already recovers each marker's 90°-step orientation (both cv2 and the pocket TS detector match all 4 rotations) — but we discard it. Use it: **one rotation tile per axis**, where the placed orientation selects the angle (0°/90°/180°/270° → π/4, π/2, π, −π/2). Tile face redesign: dial-style, angle labels on all four edges, current-angle at top. Replaces 12 rotation tiles with 3; "turn the tile to turn the knob" is the most physical parameter control imaginable. Touches: detector APIs (expose rotation), circuit builder (angle from orientation), tile-face + 3D generators, marker-ids docs. Non-rotation tiles stay orientation-free. Caveat: hysteresis/stabilizer must treat orientation changes as gate changes (re-emission), and accidental slight rotations must snap to quadrants (they do — 90° steps).
