@@ -82,6 +82,32 @@ Landscape (primary, ~4:3):
 - Board affordances: until 3+ corners are seen, a gentle overlay on the
   preview: "Point at the board — all four corners in view".
 
+## Settings, debug, golf (added per Jan, 2026-07-18)
+
+Serverless equivalents of the booth's /debug controls — all local
+(localStorage `entangible.pocket.settings`), URL params override
+(`?mode=golf&debug=1&panels=camera,results&side=left&lowpower=1`).
+
+- **Settings drawer**: gear pill in the topbar → right-side drawer (panel
+  styling): MODE (composer | golf pills), PANELS (camera preview / results /
+  state / qasm toggles — state+qasm ported from the booth), sidebar side,
+  low-power (confetti cap 60, process every 2nd frame), debug toggle.
+- **Debug panel** (toggle or `?debug=1`): detect stats (candidates, blind,
+  guided rescues, fps, corners, reprojection error), marker table
+  (id/gate/row/col/off-grid), warnings verbatim, active detector params
+  (read-only). Appended below the other panels; visitors never see it.
+- **Golf mode (MVP — first playable golf!)**: holes = 1 Superposition
+  (H on any qubit, par 1), 2 Bell (par 2), 3 GHZ-3 (par 3), 4 GHZ-4 (par 4),
+  5 GHZ-5 (par 5). Sidebar becomes: **Q-SPHERE (2D)** — static SVG flat
+  projection: concentric rings by Hamming weight 0–5, nodes on rings, node
+  radius ∝ |amplitude|, fill hue = phase, target-state nodes outlined in
+  `--entangle` purple; **SCORECARD** — hole name + target ket, par, strokes
+  (= gates on board), live fidelity %, best-of-device (localStorage); the
+  **recognized circuit stays on the stage** (golf never hides it). Hole-in at
+  fidelity ≥ 0.99 → purple banner ("EAGLE!/BIRDIE!/PAR!/HOLE IN +n" by
+  strokes vs par) + confetti; clearing the board advances to the next hole.
+  Animated state evolution deliberately absent (that's qsphere-evolution).
+
 ## Deployment
 
 - `npm run build` → static `pocket-app/dist`.
