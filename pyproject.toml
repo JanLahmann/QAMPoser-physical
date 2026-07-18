@@ -3,10 +3,11 @@
 # `uv sync` at this root creates .venv and installs all members editable.
 
 [tool.uv.workspace]
-members = ["packages/*"]
+members = ["packages/*", "hardware"]
 
 [tool.uv.sources]
 qamposer-vision = { workspace = true }
+qamposer-assets = { workspace = true }
 
 # Dev tooling shared across the workspace, installed by `uv sync` by default.
 [dependency-groups]

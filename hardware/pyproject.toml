@@ -1,0 +1,27 @@
+[project]
+name = "qamposer-hardware"
+version = "0.1.0"
+description = "3D-printable multi-color gate tiles for Entangible (Prusa Core One + MMU)."
+requires-python = ">=3.11"
+dependencies = [
+    "build123d",
+    "qamposer-assets",
+    "qamposer-vision",
+]
+
+[project.optional-dependencies]
+dev = ["pytest"]
+
+[project.scripts]
+qamposer-hardware = "qamposer_hardware.cli:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/qamposer_hardware"]
+
+[tool.uv.sources]
+qamposer-assets = { workspace = true }
+qamposer-vision = { workspace = true }
