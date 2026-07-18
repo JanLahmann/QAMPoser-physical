@@ -1,4 +1,4 @@
-# uv workspace root for Entangible (QAMPoser-physical).
+# uv workspace root for Entangible.
 # Virtual root: no [project] here — it only aggregates the member packages.
 # `uv sync` at this root creates .venv and installs all members editable.
 

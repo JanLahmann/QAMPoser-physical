@@ -14,8 +14,8 @@ import { TEST_BOARDS } from './testBoards';
 import { reduceViewer, CLOSED, type ViewerAction } from './viewer';
 import kitPdf from '../../../examples/print/entangible-print-kit-A4.pdf?url';
 
-const REPO_URL = 'https://github.com/JanLahmann/QAMPoser-physical';
-const ISSUES_URL = 'https://github.com/JanLahmann/QAMPoser-physical/issues';
+const REPO_URL = 'https://github.com/JanLahmann/entangible';
+const ISSUES_URL = 'https://github.com/JanLahmann/entangible/issues';
 const QAMPOSER_URL = 'https://qamposer.org';
 const RASQBERRY_URL = 'https://rasqberry.org';
 

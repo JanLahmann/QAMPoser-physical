@@ -1,10 +1,10 @@
-# QAMPoser-physical — Physical Quantum Circuit Composer
+# Entangible (né QAMPoser-physical) — Physical Quantum Circuit Composer
 
 > Design approved 2026-07-11 (planned in Claude Code on the web, ultraplan session). Implementation follows milestones M1–M6 below.
 
 ## Context
 
-QAMPoser (github.com/QAMP-62) is an open-source, embeddable quantum circuit composer (like IBM Quantum Composer): `@qamposer/react` (TS/React editor + Q-sphere/histogram, OpenQASM 2 utils, pluggable `SimulationAdapter`, in-browser `localAdapter`) and `qamposer-backend` (FastAPI + Qiskit 2.x for noisy/real simulation). This new repo (**QAMPoser-physical**, currently empty) adds a *tangible* composer: visitors at events/fairs/booths build circuits on a table from printed gate tiles on a printed board mat; a camera recognizes the layout and a big screen shows the live circuit and simulation results. Hosts: Raspberry Pi 4/5 (RasQberry.org, Bookworm 64-bit) and macOS; cameras: USB/Pi Camera, Mac Continuity Camera (iPhone as webcam), and iPhone browser streaming to the host.
+QAMPoser (github.com/QAMP-62) is an open-source, embeddable quantum circuit composer (like IBM Quantum Composer): `@qamposer/react` (TS/React editor + Q-sphere/histogram, OpenQASM 2 utils, pluggable `SimulationAdapter`, in-browser `localAdapter`) and `qamposer-backend` (FastAPI + Qiskit 2.x for noisy/real simulation). This new repo (**entangible**, formerly QAMPoser-physical, empty at design time) adds a *tangible* composer: visitors at events/fairs/booths build circuits on a table from printed gate tiles on a printed board mat; a camera recognizes the layout and a big screen shows the live circuit and simulation results. Hosts: Raspberry Pi 4/5 (RasQberry.org, Bookworm 64-bit) and macOS; cameras: USB/Pi Camera, Mac Continuity Camera (iPhone as webcam), and iPhone browser streaming to the host.
 
 **Decided with the user:** ArUco fiducial markers on tiles (not symbol ML); v1 physical kit is printed PDF tiles + board mat (3D-printed STLs later, sharing the tile-face design); all three camera paths; the vision component is Python and feeds the existing `@qamposer/react` UI in controlled mode (no new editor); circuits also exposed as OpenQASM 2; **realtime simulation is noise-free in-browser via `localAdapter` — no backend required**; `qamposer-backend` is an *optional* add-on for noisy/real-hardware runs via `qiskitAdapter`.
 

@@ -1,4 +1,4 @@
-# QAMPoser-physical
+# Entangible
 
 **Entangible** — the QAMPoser physical quantum circuit composer. Visitors at
 events, fairs, and booths build real quantum circuits on a table from printed
