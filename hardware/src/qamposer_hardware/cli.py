@@ -18,9 +18,23 @@ from pathlib import Path
 from qamposer_assets.config import AssetsConfig, load_config
 from qamposer_vision.markers import MARKER_TABLE, GateSpec
 
-from .build import build_tile
-from .export import export_tile_3mf, export_tile_stls, tile_slug, write_plates_md
-from .params import HardwareParams, variant_height, variant_names
+from .build import build_double_tile, build_tile
+from .export import (
+    double_slug,
+    export_double_tile_3mf,
+    export_double_tile_stls,
+    export_tile_3mf,
+    export_tile_stls,
+    tile_slug,
+    write_double_plates_md,
+    write_plates_md,
+)
+from .params import (
+    DOUBLE_FACED_KIT,
+    HardwareParams,
+    variant_height,
+    variant_names,
+)
 
 __all__ = ["main"]
 
@@ -65,6 +79,32 @@ def _resolve_gates(arg: str) -> list[int]:
     if not ids:
         raise SystemExit(f"no gate tiles matched --gates {arg!r}")
     return ids
+
+
+def _resolve_double_kit(arg: str) -> list[tuple[int, int | None, int]]:
+    """Filter :data:`DOUBLE_FACED_KIT` by ``--gates`` (matches either face)."""
+    if arg.strip().lower() == "all":
+        return list(DOUBLE_FACED_KIT)
+    wanted_families: set[str] = set()
+    wanted_ids: set[int] = set()
+    for tok in arg.split(","):
+        tok = tok.strip()
+        if not tok:
+            continue
+        if tok.isdigit():
+            wanted_ids.add(int(tok))
+        else:
+            wanted_families.add(tok.upper())
+    out: list[tuple[int, int | None, int]] = []
+    for a, b, qty in DOUBLE_FACED_KIT:
+        mb = a if b is None else b
+        ids = {a, mb}
+        fams = {MARKER_TABLE[a].gate.upper(), MARKER_TABLE[mb].gate.upper()}
+        if (ids & wanted_ids) or (fams & wanted_families):
+            out.append((a, b, qty))
+    if not out:
+        raise SystemExit(f"no double-faced pieces matched --gates {arg!r}")
+    return out
 
 
 def _resolve_variants(arg: str) -> list[str]:
@@ -124,6 +164,55 @@ def _generate(
     return 0
 
 
+def _generate_double(
+    config: AssetsConfig,
+    variants: list[str],
+    kit: list[tuple[int, int | None, int]],
+    out_root: Path,
+) -> int:
+    params = HardwareParams()
+    total_files = 0
+    total_bytes = 0
+    grand_t0 = time.time()
+
+    for variant in variants:
+        height = variant_height(variant, faces="double")
+        vdir = out_root / f"{variant}-double"
+        vdir.mkdir(parents=True, exist_ok=True)
+        n_pieces = sum(qty for _a, _b, qty in kit)
+        print(
+            f"[{variant}-double] height={height:g} mm  "
+            f"{len(kit)} designs / {n_pieces} pieces -> {vdir}"
+        )
+        for a, b, qty in kit:
+            mb = a if b is None else b
+            slug = double_slug(MARKER_TABLE[a], MARKER_TABLE[mb])
+            t0 = time.time()
+            parts = build_double_tile(
+                a, b, config, variant=variant, height=height, params=params
+            )
+            stls = export_double_tile_stls(parts, vdir)
+            tmf = export_double_tile_3mf(parts, vdir)
+            dt = time.time() - t0
+            files = list(stls) + ([tmf] if tmf else [])
+            nbytes = sum(p.stat().st_size for p in files)
+            total_files += len(files)
+            total_bytes += nbytes
+            print(
+                f"    {slug:20s} ×{qty}  "
+                f"{len(files)} files {nbytes/1024:7.1f} KiB  {dt:4.2f}s"
+            )
+        write_double_plates_md(config, kit, vdir)
+        total_files += 1
+
+    dt = time.time() - grand_t0
+    print(
+        f"\nDone: {total_files} files, {total_bytes/1024/1024:.2f} MiB, "
+        f"{dt:.1f}s total."
+    )
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         prog="qamposer-hardware",
@@ -133,8 +222,12 @@ def main(argv: list[str] | None = None) -> int:
 
     gen = sub.add_parser("generate", help="generate STL/3MF tiles")
     gen.add_argument(
+        "--faces", default="single", choices=("single", "double"),
+        help="single-faced tiles (default) | double-faced flip pieces",
+    )
+    gen.add_argument(
         "--variant", default="tile",
-        help="tile (6 mm) | cube (60 mm) | all (default: tile)",
+        help="tile (single 6 mm / double 8 mm) | cube (60 mm) | all (default: tile)",
     )
     gen.add_argument(
         "--gates", default="all",
@@ -153,6 +246,9 @@ def main(argv: list[str] | None = None) -> int:
     if args.command == "generate":
         config = load_config()
         variants = _resolve_variants(args.variant)
+        if args.faces == "double":
+            kit = _resolve_double_kit(args.gates)
+            return _generate_double(config, variants, kit, args.out)
         ids = _resolve_gates(args.gates)
         return _generate(
             config, variants, ids, args.out, magnets=args.magnets

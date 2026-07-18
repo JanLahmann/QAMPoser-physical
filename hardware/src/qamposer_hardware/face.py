@@ -31,6 +31,7 @@ __all__ = [
     "accent_color_name",
     "face_layout",
     "notch_count",
+    "double_notch_rects",
     "COLOR_NAMES",
 ]
 
@@ -138,6 +139,20 @@ def accent_color_name(hex_color: str) -> str:
     return COLOR_NAMES.get(hex_color.lower(), hex_color.lstrip("#").lower())
 
 
+#: Double-faced pieces can carry *both* blues on one piece (e.g. X | Z), so they
+#: need names that tell the two blues apart on a filename / plate. Only the two
+#: blues are overridden; red and magenta keep their :data:`COLOR_NAMES` names.
+DOUBLE_COLOR_NAMES: dict[str, str] = {
+    "#002d9c": "darkblue",
+    "#33b1ff": "lightblue",
+}
+
+
+def double_color_name(hex_color: str) -> str:
+    """Filament-slot name for a double-faced piece (distinguishes the two blues)."""
+    return DOUBLE_COLOR_NAMES.get(hex_color.lower(), accent_color_name(hex_color))
+
+
 def _notch_rects(
     size: float, count: int, *, width: float = 1.6, depth: float = 1.5, pitch: float = 4.0
 ) -> tuple[Rect, ...]:
@@ -155,6 +170,43 @@ def _notch_rects(
     for i in range(count):
         cx = x0 + i * pitch
         rects.append(Rect(cx=cx, cy=0.0, w=width, h=2.0 * depth))
+    return tuple(rects)
+
+
+def double_notch_rects(
+    size: float,
+    count: int,
+    *,
+    edge: str,
+    half: str,
+    width: float = 1.6,
+    depth: float = 1.5,
+    pitch: float = 4.0,
+) -> tuple[Rect, ...]:
+    """Tactile notches for one face of a *double*-faced piece.
+
+    ``edge`` selects the band edge the slots are cut into: ``"bottom"`` (y = 0,
+    the top face's band edge) or ``"top"`` (y = size, where the mirrored bottom
+    face's band lands). ``half`` places the cluster along that edge:
+    ``"left"`` (centred on x = size/4), ``"right"`` (x = 3·size/4) or
+    ``"center"`` (x = size/2). On a double-faced piece face A takes the LEFT
+    half and face B the RIGHT half so the two faces' notches never collide or
+    confuse; same-gate pieces would use ``"center"`` on both (the shipped kit
+    has no same-gate pieces, but the option is kept).
+    """
+    if count <= 0:
+        return ()
+    cy = 0.0 if edge == "bottom" else size
+    centres = {"left": size * 0.25, "right": size * 0.75, "center": size * 0.5}
+    if half not in centres:
+        raise ValueError(f"half must be left|right|center, got {half!r}")
+    cluster_cx = centres[half]
+    span = (count - 1) * pitch
+    x0 = cluster_cx - span / 2.0
+    rects: list[Rect] = []
+    for i in range(count):
+        cx = x0 + i * pitch
+        rects.append(Rect(cx=cx, cy=cy, w=width, h=2.0 * depth))
     return tuple(rects)
 
 

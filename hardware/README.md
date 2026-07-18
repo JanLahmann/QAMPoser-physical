@@ -92,6 +92,93 @@ set uses **4** accent colours, so tiles split across **2 plates**:
 Hex values are read from `assets.toml` — they are exactly `@qamposer/react`'s
 `GATE_COLORS`, so a tile in hand matches its gate on screen.
 
+## Double-faced pieces
+
+A **double-faced** piece carries a gate on *both* sides: face A on top, face B on
+the underside. **Flip it over its bottom (band) edge and the gate switches.** This
+halves the number of loose tiles a booth has to store and makes inverse pairs a
+single physical object.
+
+```bash
+uv run qamposer-hardware generate --faces double --variant tile   # the 24-piece kit
+uv run qamposer-hardware generate --faces double --variant cube --gates 14,21,40
+uv run qamposer-hardware generate --faces double --variant all
+```
+
+Double output lands in `out/hardware/<variant>-double/`. The **tile** variant is
+**8 mm** tall: 0.8 mm colour (face A) + 6.4 mm white core + 0.8 mm colour
+(face B). The **cube** stays 60 mm (top + bottom faces, hollow core). Piece
+filenames pair both gates, e.g. `cnot-ctrl+cnot-tgt-body-white.stl`,
+`rx-p2+rx-m2.3mf`, `h+x-accent-red.stl`.
+
+### The kit (24 pieces)
+
+| Piece | Faces | Flip meaning | Qty |
+| ----- | ----- | ------------ | --- |
+| `cnot-ctrl+cnot-tgt` | CNOT ● \| CNOT ⊕ | control ↔ target | 4 |
+| `rx-p2+rx-m2` / `ry…` / `rz…` | R·(+π/2) \| R·(−π/2) | **flip = inverse** | 1 each |
+| `rx-p4+rx-p1` / `ry…` / `rz…` | R·(π/4) \| R·(π) | quarter ↔ half turn | 1 each |
+| `s+t` | S \| T | S ↔ T | 2 |
+| `h+x`, `h+y`, `h+z`, `x+y`, `x+z`, `y+z` | mixed single-qubit | swap the two gates | 2 each |
+
+The single-qubit pieces mix **every** H/X/Y/Z pair twice, so each of H, X, Y, Z is
+available on exactly **6 faces**. The ±π/2 rotation pieces are genuine inverses:
+flipping `rx-p2+rx-m2` gives you RX(−π/2) = RX(π/2)⁻¹.
+
+### How the mirror works
+
+The underside is the same 0.8 mm colour-region construction as the top, but the
+whole face (marker, band, caption) is **mirrored about the X axis** (reflected
+`y → size − y`) before it is placed on the bottom layer. That mirror is exactly
+undone by the physical flip: when you roll the piece 180° over its bottom band
+edge, the underside comes up **unmirrored**, band at the bottom, and its ArUco
+marker decodes to face B's canonical ID. (Reflecting the caption too means the
+text also reads correctly after the flip — the two mirrors cancel.) This is the
+suite's critical test: it simulates the roll-over-the-edge flip and asserts an
+overhead camera reads face B's canonical bit matrix cell-for-cell.
+
+Because the underside is now a functional marker face, double-faced pieces get
+**no elephant-foot chamfer** on that edge, and `--magnets` is not offered for
+them (a pocket would destroy the bottom marker).
+
+### Two accents per piece (cross-family)
+
+Same-family pieces (CNOT ●\|⊕, the rotation pairs, S\|T) print in **one** accent
+colour, so they have the usual three parts (body / marker / accent). The
+**mixed** H/X/Y/Z pieces span two gate colours — e.g. `h+x` is red (H, top) +
+dark blue (X, bottom) — so they carry **two** accent parts,
+`…-accent-red.stl` **and** `…-accent-darkblue.stl`, and their `.3mf` has four
+coloured parts. The two blues are named **darkblue** (`#002d9c`) and
+**lightblue** (`#33b1ff`) in double-piece filenames so a piece that carries both
+is unambiguous.
+
+### Plates (double kit)
+
+`plates.md` in the double output uses a relaxed rule: a plate hosts any pieces
+whose **combined** accent families number ≤ 3 (white + black + 3 MMU slots). The
+mixed pieces cover all six cross-family colour pairs, which cannot fit on two
+3-family plates, so the double kit needs **3 plates**:
+
+| Plate | Accent slots | Pieces |
+| ----- | ------------ | ------ |
+| 1 | dark blue, magenta, light blue | CNOT, all RX/RY/RZ pairs, S\|T, X\|Y, X\|Z, Y\|Z |
+| 2 | red, dark blue, magenta | H\|X, H\|Y |
+| 3 | red, light blue | H\|Z |
+
+For a cross-family piece, load both its accent filaments on the same plate and
+assign each `…-accent-<colour>` part (or open the `.3mf`) to the matching slot.
+
+### Print orientation (double-faced)
+
+Both faces are marker-critical, but only the **up-facing** one can be ironed, so
+one face is always slightly crisper. On the textured PEI sheet a double tile
+prints fine with **either** face down (MMU lays multi-region colour on the first
+layer cleanly). Recommended: print with the **marker face you care most about UP**
+and **ironing on the top surface only**; or print on a **smooth sheet** so the
+bottom face comes out glossy-flat too. Keep the seam to **Rear** and a correct
+first-layer Z-offset. If detection of the down-face is marginal, reprint that
+piece with the other face up.
+
 ## Rotation-angle tactile notches
 
 Rotation tiles (RX/RY/RZ) carry the full angle in the band caption (`RX π/2`,
@@ -108,6 +195,13 @@ by hand, the bottom band edge carries small notches encoding the angle:
 The count is the angle's index in `qamposer_vision.markers.ROTATION_ANGLES`.
 Non-rotation tiles have no notches. The notches are shallow slots in the band
 edge and do not affect the 60 × 60 footprint bounding box.
+
+On a **double-faced** rotation piece both faces carry notches, so they are split
+to opposite halves to stay legible by touch: **face A's** notches sit on the
+**left half** of its (bottom) band edge, **face B's** on the **right half** of
+its (top, opposite) band edge. So `rx-p2+rx-m2` has 2 notches bottom-left
+(RX π/2) and 4 notches top-right (RX −π/2) — feel the left edge for the face-up
+angle, the right edge for the flip side.
 
 ## Cube parallax caveat
 

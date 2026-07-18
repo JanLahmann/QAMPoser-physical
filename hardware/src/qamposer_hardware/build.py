@@ -23,6 +23,7 @@ from build123d import (
     Cylinder,
     FontStyle,
     Location,
+    Plane,
     Pos,
     Rectangle,
     RectangleRounded,
@@ -30,13 +31,25 @@ from build123d import (
     Text,
     chamfer,
     extrude,
+    mirror,
 )
 from qamposer_assets.config import AssetsConfig
 
-from .face import FaceLayout, face_layout
+from .face import (
+    FaceLayout,
+    double_color_name,
+    double_notch_rects,
+    face_layout,
+)
 from .params import HardwareParams
 
-__all__ = ["TileParts", "build_tile", "footprint_area"]
+__all__ = [
+    "TileParts",
+    "DoubleTileParts",
+    "build_tile",
+    "build_double_tile",
+    "footprint_area",
+]
 
 #: Font used for the band caption. IBM Plex Sans (the print font) if the host
 #: has it, else the same Helvetica/Arial fallback the 2D face declares.
@@ -252,4 +265,163 @@ def build_tile(
         body=white_body,
         marker=marker,
         accent=accent,
+    )
+
+
+# --------------------------------------------------------------------------- #
+# Double-faced pieces
+# --------------------------------------------------------------------------- #
+
+
+@dataclass(slots=True)
+class DoubleTileParts:
+    """Colour solids of a double-faced piece (face A on top, face B underneath).
+
+    ``accents`` groups the accent geometry by filament colour: same-family pieces
+    (CNOT, rotations, S | T) yield one accent solid; cross-family pieces (the
+    mixed H/X/Y/Z pieces) yield two, one per gate colour.
+    """
+
+    layout_a: FaceLayout  # top face (as printed / viewed from above)
+    layout_b: FaceLayout  # bottom face (mirrored; reads canonically once flipped)
+    variant: str
+    height: float
+    body: Solid  # white
+    marker: Solid  # black — both faces' markers
+    accents: list[tuple[str, Solid]]  # (accent_hex, solid), grouped by colour
+
+    def named_parts(self) -> list[tuple[str, str, str, Solid]]:
+        """``(role, colour_name, colour_hex, solid)`` for each part, print order."""
+        out: list[tuple[str, str, str, Solid]] = [
+            ("body", "white", "#ffffff", self.body),
+            ("marker", "black", "#000000", self.marker),
+        ]
+        for hexc, solid in self.accents:
+            out.append(("accent", double_color_name(hexc), hexc, solid))
+        return out
+
+
+def _extrude_bottom(sketch, face_depth: float) -> Solid:
+    """Extrude a face sketch through the bottom ``face_depth`` mm (z ∈ [0, fd])."""
+    return extrude(sketch, amount=face_depth)
+
+
+def _mirror_y(sketch, size: float):
+    """Reflect a face sketch about the X axis at ``y = size/2`` (y → size − y).
+
+    This is the "roll over the bottom band edge" flip expressed in the face
+    plane: it repositions *and* reflects every region (marker, band, glyphs), so
+    that once the physical piece is flipped over its bottom edge the underside
+    reads unmirrored, band at the bottom, ArUco decodable.
+    """
+    return Pos(0.0, size, 0.0) * mirror(sketch, about=Plane.XZ)
+
+
+def _double_footprint(layout: FaceLayout, notches_a, notches_b):
+    """Rounded outline with face A's notches (bottom edge) and face B's (top)."""
+    prof = Pos(layout.size / 2.0, layout.size / 2.0) * RectangleRounded(
+        layout.size, layout.size, layout.corner_radius
+    )
+    for nr in (*notches_a, *notches_b):
+        prof = prof - Pos(nr.cx, nr.cy) * Rectangle(nr.w, nr.h)
+    return prof
+
+
+def _bottom_marker_solid(
+    layout: FaceLayout, size: float, face_depth: float, bleed: float
+) -> Solid:
+    """Face B marker in the bottom colour layer, mirrored (y → size − y)."""
+    m = layout.module_size + 2.0 * bleed
+    solid: Solid | None = None
+    for cell in layout.modules:
+        if cell.bit != 1:
+            continue
+        box = Box(m, m, face_depth, align=(Align.CENTER, Align.CENTER, Align.MIN))
+        box = Pos(cell.rect.cx, size - cell.rect.cy, 0.0) * box
+        solid = box if solid is None else solid + box
+    if solid is None:
+        raise ValueError(f"marker {layout.marker_id} produced no black modules")
+    return solid
+
+
+def build_double_tile(
+    marker_a: int,
+    marker_b: int | None,
+    config: AssetsConfig,
+    *,
+    variant: str,
+    height: float,
+    params: HardwareParams | None = None,
+) -> DoubleTileParts:
+    """Build a double-faced piece: face A on top, face B mirrored underneath.
+
+    ``marker_b is None`` means "same gate both sides" (kept for completeness; the
+    shipped kit has no such piece). The two colour faces occupy the top and
+    bottom ``face_depth`` mm; the white core fills the middle. No elephant-foot
+    chamfer is applied — the underside is now a marker face.
+    """
+    params = params or HardwareParams()
+    fd = params.face_depth
+    mb = marker_a if marker_b is None else marker_b
+    same = mb == marker_a
+
+    layout_a = face_layout(marker_a, config)
+    layout_b = face_layout(mb, config)
+    size = layout_a.size
+
+    # Notches: face A on the LEFT half of the bottom edge, face B on the RIGHT
+    # half of the top edge (where its mirrored band lands); centred if same-gate.
+    notches_a = double_notch_rects(
+        size, layout_a.notch_count, edge="bottom", half="center" if same else "left"
+    )
+    notches_b = double_notch_rects(
+        size, layout_b.notch_count, edge="top", half="center" if same else "right"
+    )
+    footprint = _double_footprint(layout_a, notches_a, notches_b)
+
+    # --- white body (no bottom chamfer; hollow only for tall/cube heights) ----
+    body = extrude(footprint, amount=height)
+    if height > params.hollow_min_height:
+        body = _hollow(body, layout_a, params, height)
+
+    # --- top face A: accent = slab - white-field - glyphs (z ∈ [h-fd, h]) -----
+    slab_top = _extrude_top(footprint, height, fd)
+    wf_top = _extrude_top(_white_field_sketch(layout_a), height, fd)
+    accent_a = slab_top - wf_top
+    glyph_a = _glyph_sketch(layout_a, config)
+    if glyph_a is not None:
+        accent_a = accent_a - _extrude_top(glyph_a, height, fd)
+    marker_top = _marker_solid(layout_a, height, fd, params.marker_bleed)
+
+    # --- bottom face B: same construction, mirrored, z ∈ [0, fd] --------------
+    slab_bot = _extrude_bottom(footprint, fd)
+    wf_bot = _extrude_bottom(_mirror_y(_white_field_sketch(layout_b), size), fd)
+    accent_b = slab_bot - wf_bot
+    glyph_b = _glyph_sketch(layout_b, config)
+    if glyph_b is not None:
+        accent_b = accent_b - _extrude_bottom(_mirror_y(glyph_b, size), fd)
+    marker_bot = _bottom_marker_solid(layout_b, size, fd, params.marker_bleed)
+
+    marker = marker_top + marker_bot
+
+    # Group accents by filament colour (one part if same-family, else two).
+    hex_a = layout_a.accent_hex
+    hex_b = layout_b.accent_hex
+    if hex_a.lower() == hex_b.lower():
+        accents: list[tuple[str, Solid]] = [(hex_a, accent_a + accent_b)]
+    else:
+        accents = [(hex_a, accent_a), (hex_b, accent_b)]
+
+    white_body = body - marker
+    for _hex, acc in accents:
+        white_body = white_body - acc
+
+    return DoubleTileParts(
+        layout_a=layout_a,
+        layout_b=layout_b,
+        variant=variant,
+        height=height,
+        body=white_body,
+        marker=marker,
+        accents=accents,
     )
