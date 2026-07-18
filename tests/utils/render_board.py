@@ -159,6 +159,15 @@ def render_board(
     return canvas
 
 
+def render_scenario(
+    name: str, options: RenderOptions | None = None
+) -> np.ndarray:
+    """Render a named :data:`SCENARIOS` layout (BGR). Convenience for tooling."""
+    scenario = SCENARIOS_BY_NAME[name]
+    config = BoardConfig.from_toml()
+    return render_board(scenario.placements, config, options)
+
+
 def _apply_warp(image: np.ndarray, strength: float) -> np.ndarray:
     """Apply a plausible, deterministic camera-angle homography."""
     h, w = image.shape[:2]
@@ -177,3 +186,47 @@ def _apply_warp(image: np.ndarray, strength: float) -> np.ndarray:
     return cv2.warpPerspective(
         image, matrix, (w, h), borderValue=(255, 255, 255)
     )
+
+
+def _main() -> None:
+    """Additive CLI: render one scenario to a PNG (used by the pocket benchmark).
+
+    Example::
+
+        uv run python tests/utils/render_board.py \
+            --scenario ghz3 --px-per-mm 3.0 --warp 0.08 --out /tmp/ghz3.png
+    """
+    import argparse
+
+    parser = argparse.ArgumentParser(description="Render a scenario board PNG.")
+    parser.add_argument("--scenario", required=True, choices=sorted(SCENARIOS_BY_NAME))
+    parser.add_argument("--out", required=True)
+    parser.add_argument("--px-per-mm", type=float, default=3.0)
+    parser.add_argument("--pad-mm", type=float, default=30.0)
+    parser.add_argument("--warp", type=float, default=None)
+    parser.add_argument("--blur-sigma", type=float, default=0.0)
+    parser.add_argument("--noise-sigma", type=float, default=0.0)
+    parser.add_argument("--seed", type=int, default=0)
+    args = parser.parse_args()
+
+    opt = RenderOptions(
+        px_per_mm=args.px_per_mm,
+        pad_mm=args.pad_mm,
+        warp=args.warp,
+        blur_sigma=args.blur_sigma,
+        noise_sigma=args.noise_sigma,
+        seed=args.seed,
+    )
+    image = render_scenario(args.scenario, opt)
+    cv2.imwrite(args.out, image)
+    print(args.out)
+
+
+if __name__ == "__main__":  # pragma: no cover - CLI entry for tooling
+    import sys
+    from pathlib import Path
+
+    _REPO_ROOT = Path(__file__).resolve().parents[2]
+    if str(_REPO_ROOT) not in sys.path:
+        sys.path.insert(0, str(_REPO_ROOT))
+    _main()

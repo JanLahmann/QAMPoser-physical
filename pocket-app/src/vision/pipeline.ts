@@ -4,8 +4,17 @@
  * `_rebuild_and_maybe_emit` + warning composition), minus the threading — the
  * app drives `processFrame` from a requestAnimationFrame loop.
  */
-import { detectMarkers, type DetectedMarker, type RgbaImage, type GrayImage } from './detect';
+import {
+  detectMarkers,
+  toGray,
+  type DetectedMarker,
+  type DetectOptions,
+  type DetectStats,
+  type RgbaImage,
+  type GrayImage,
+} from './detect';
 import { fitBoard, type BoardResult } from './board';
+import { guidedRedetect } from './guided';
 import { GridMapper } from './grid';
 import { BOARD, CORNER_IDS } from './geometry';
 import { MARKER_TABLE } from './markers';
@@ -29,6 +38,15 @@ export interface MarkerObs {
   readonly offGrid: boolean;
 }
 
+export interface FrameStats {
+  /** Convex quad candidates the blind detector examined this frame. */
+  readonly candidates: number;
+  /** Markers decoded by blind contour/quad detection. */
+  readonly blindHits: number;
+  /** Extra markers recovered by grid-guided redetection. */
+  readonly guidedRescues: number;
+}
+
 export interface FrameResult {
   /** True on frames where the stable circuit actually changed. */
   readonly changed: boolean;
@@ -41,6 +59,15 @@ export interface FrameResult {
   /** Raw detector output, for the debug overlay (marker outlines, board quad). */
   readonly detected: DetectedMarker[];
   readonly board: BoardResult | null;
+  /** Per-frame detection counters for the debug overlay. */
+  readonly stats: FrameStats;
+}
+
+export interface PipelineOptions {
+  /** Grid-guided redetection of missing cells once the board locks (default true). */
+  guided?: boolean;
+  /** Per-frame detector tuning (subpixel refine, robust sampling, thresholds). */
+  detect?: DetectOptions;
 }
 
 export class PocketPipeline {
@@ -49,6 +76,13 @@ export class PocketPipeline {
   private lastCircuit: BuildResult['circuit'] | null = null;
   private structuralWarnings: BuildWarning[] = [];
   private emitted = false;
+  private readonly guided: boolean;
+  private readonly detectOptions: DetectOptions;
+
+  constructor(options: PipelineOptions = {}) {
+    this.guided = options.guided ?? true;
+    this.detectOptions = options.detect ?? {};
+  }
 
   reset(): void {
     this.stabilizer.reset();
@@ -58,8 +92,27 @@ export class PocketPipeline {
   }
 
   processFrame(image: RgbaImage | GrayImage): FrameResult {
-    const detected = detectMarkers(image);
-    const board = fitBoard(detected);
+    // Grayscale once, then share it across blind detection and the guided pass.
+    const gray: GrayImage =
+      'data' in image && (image as RgbaImage).data.length === image.width * image.height * 4
+        ? toGray(image as RgbaImage)
+        : (image as GrayImage);
+
+    const detectStats: DetectStats = { candidates: 0 };
+    const blind = detectMarkers(gray, this.detectOptions, detectStats);
+    const board = fitBoard(blind);
+
+    // Grid-guided redetection: recover markers the blind front end missed in
+    // cells whose expected quad we can now project through the locked board.
+    let detected = blind;
+    let guidedRescues = 0;
+    if (board && this.guided) {
+      const stats = { rescued: 0 };
+      const rescued = guidedRedetect(gray, board, blind, this.grid, stats);
+      guidedRescues = stats.rescued;
+      if (rescued.length > 0) detected = [...blind, ...rescued];
+    }
+
     const corners = detected.filter((m) => String(m.id) in CORNER_IDS).length;
 
     const { observations, markerObs, offGridWarnings } = this.mapMarkers(detected, board);
@@ -82,6 +135,11 @@ export class PocketPipeline {
       markers: markerObs,
       detected,
       board,
+      stats: {
+        candidates: detectStats.candidates,
+        blindHits: blind.length,
+        guidedRescues,
+      },
     };
   }
 

@@ -70,6 +70,8 @@ function drawOverlay(
   board: BoardResult | null,
   w: number,
   h: number,
+  stats: FrameResult['stats'],
+  fps: number,
 ): void {
   if (canvas.width !== w) canvas.width = w;
   if (canvas.height !== h) canvas.height = h;
@@ -109,6 +111,18 @@ function drawOverlay(
     ctx.closePath();
     ctx.stroke();
   }
+
+  // Debug counters HUD (top-left) — doubles as the /debug view (docs/pocket.md).
+  const fontPx = Math.max(11, Math.round(w / 95));
+  const pad = Math.round(fontPx * 0.8);
+  ctx.font = `${fontPx}px ui-monospace, SFMono-Regular, monospace`;
+  ctx.textBaseline = 'top';
+  const line = `cand ${stats.candidates} · blind ${stats.blindHits} · guided ${stats.guidedRescues} · ${fps} fps`;
+  ctx.lineWidth = Math.max(3, fontPx / 4);
+  ctx.strokeStyle = 'rgba(0, 0, 0, 0.6)';
+  ctx.strokeText(line, pad, pad);
+  ctx.fillStyle = 'rgba(255, 255, 255, 0.95)';
+  ctx.fillText(line, pad, pad);
 }
 
 export function App() {
@@ -120,6 +134,7 @@ export function App() {
   const [hintIndex, setHintIndex] = useState(0);
 
   const overlayRef = useRef<HTMLCanvasElement>(null);
+  const fpsRef = useRef(0);
   const momentStateRef = useRef<MomentState>(initialMomentState);
   const prevCircuitRef = useRef<Circuit>(createDefaultCircuit(BOARD_QUBITS));
   const tokenRef = useRef(0);
@@ -132,7 +147,15 @@ export function App() {
     (result: FrameResult, video: HTMLVideoElement) => {
       // Overlay every processed frame (cheap; keeps the debug view live).
       if (overlayRef.current) {
-        drawOverlay(overlayRef.current, result.detected, result.board, video.videoWidth, video.videoHeight);
+        drawOverlay(
+          overlayRef.current,
+          result.detected,
+          result.board,
+          video.videoWidth,
+          video.videoHeight,
+          result.stats,
+          fpsRef.current,
+        );
       }
       setCorners(result.corners);
 
@@ -155,6 +178,7 @@ export function App() {
   );
 
   const camera = useCamera({ onResult });
+  fpsRef.current = camera.fps;
 
   useEffect(() => {
     const id = window.setInterval(

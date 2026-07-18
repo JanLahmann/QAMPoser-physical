@@ -316,18 +316,13 @@ const SUBSAMPLES = 4;
 /** Fraction of a module cell sampled (central portion), avoiding module seams. */
 const CELL_SPAN = 0.6;
 
-/**
- * Sample a 6×6 grid of module grays across the quad. Each module is averaged
- * over a `SUBSAMPLES`×`SUBSAMPLES` block covering its central `CELL_SPAN` — far
- * more robust to sensor/render noise than a single point, which is what let a
- * lone noisy pixel flip a border module and fail the border check.
- */
-function sampleGridGray(
+/** Bilinear-map a (u, v) in the unit quad to image px and sample the gray. */
+function quadSampler(
   gray: GrayImage,
   corners: [Corner, Corner, Corner, Corner],
-): number[] {
+): (u: number, v: number) => number {
   const [tl, tr, br, bl] = corners;
-  const sample = (u: number, v: number): number => {
+  return (u: number, v: number): number => {
     const topX = tl[0] + (tr[0] - tl[0]) * u;
     const topY = tl[1] + (tr[1] - tl[1]) * u;
     const botX = bl[0] + (br[0] - bl[0]) * u;
@@ -336,26 +331,86 @@ function sampleGridGray(
     const y = topY + (botY - topY) * v;
     return bilinearGray(gray, x, y);
   };
+}
 
+/** Trimmed mean: drop the top/bottom `trim` fraction, average the rest. Robust
+ * to a lone bright/dark speck (module seam, sensor noise) inside one module. */
+function trimmedMean(vals: number[], trim = 0.25): number {
+  const s = [...vals].sort((a, b) => a - b);
+  const k = Math.floor(s.length * trim);
+  let acc = 0;
+  let n = 0;
+  for (let i = k; i < s.length - k; i++) {
+    acc += s[i];
+    n++;
+  }
+  return n > 0 ? acc / n : s[s.length >> 1];
+}
+
+/**
+ * Sample a 6×6 grid of module grays across the quad. Each module is aggregated
+ * over a `SUBSAMPLES`×`SUBSAMPLES` block covering its central `CELL_SPAN` — far
+ * more robust to sensor/render noise than a single point, which is what let a
+ * lone noisy pixel flip a border module and fail the border check. In `robust`
+ * mode the per-module aggregate is a trimmed mean (rejects specks); otherwise a
+ * plain mean (the original, kept for the before/after benchmark).
+ */
+export function sampleGridGray(
+  gray: GrayImage,
+  corners: [Corner, Corner, Corner, Corner],
+  robust = false,
+): number[] {
+  const sample = quadSampler(gray, corners);
   const samples: number[] = [];
   const step = CELL_SPAN / SUBSAMPLES;
   const start = -CELL_SPAN / 2 + step / 2;
+  const block: number[] = [];
   for (let row = 0; row < GRID; row++) {
     for (let col = 0; col < GRID; col++) {
-      let acc = 0;
-      let n = 0;
+      block.length = 0;
       for (let sy = 0; sy < SUBSAMPLES; sy++) {
         for (let sx = 0; sx < SUBSAMPLES; sx++) {
           const u = (col + 0.5 + start + sx * step) / GRID;
           const v = (row + 0.5 + start + sy * step) / GRID;
-          acc += sample(u, v);
-          n++;
+          block.push(sample(u, v));
         }
       }
-      samples.push(acc / n);
+      if (robust) {
+        samples.push(trimmedMean(block));
+      } else {
+        let acc = 0;
+        for (const b of block) acc += b;
+        samples.push(acc / block.length);
+      }
     }
   }
   return samples;
+}
+
+/**
+ * Mean gray of the quiet zone just outside the marker quad — the print scheme
+ * leaves a white margin (12 mm on a 60 mm tile around its 36 mm marker; the mat
+ * around each corner fiducial). Sampled as a ring at ±`OUTSET` beyond the quad
+ * edges; the trimmed mean rejects the occasional stray dark pixel (a neighbour
+ * tile edge, a finger). Used as the "known white" reference for thresholding.
+ */
+const QUIET_OUTSET = 0.14;
+export function sampleQuietZoneWhite(
+  gray: GrayImage,
+  corners: [Corner, Corner, Corner, Corner],
+): number[] {
+  const sample = quadSampler(gray, corners);
+  const lo = -QUIET_OUTSET;
+  const hi = 1 + QUIET_OUTSET;
+  const along = [0.1, 0.3, 0.5, 0.7, 0.9];
+  const out: number[] = [];
+  for (const t of along) {
+    out.push(sample(t, lo)); // above the top edge
+    out.push(sample(t, hi)); // below the bottom edge
+    out.push(sample(lo, t)); // left of the left edge
+    out.push(sample(hi, t)); // right of the right edge
+  }
+  return out;
 }
 
 /**
@@ -365,7 +420,7 @@ function sampleGridGray(
  * sit at the low cluster's edge (0) and mis-classify the black modules. Centring
  * across the plateau puts the threshold safely between black and white.
  */
-function otsu(samples: number[]): number {
+export function otsu(samples: number[]): number {
   const hist = new Array<number>(256).fill(0);
   for (const s of samples) hist[Math.max(0, Math.min(255, Math.round(s)))]++;
   const total = samples.length;
@@ -396,15 +451,55 @@ function otsu(samples: number[]): number {
   return Math.floor((firstBest + lastBest) / 2);
 }
 
-/** Binarize a 6×6 gray sample set into a bit grid (1 = black module). */
-export function grayToBitGrid(samples: number[]): number[][] {
-  const threshold = otsu(samples);
+/** Plain mean of a sample set — a threshold candidate for the guided decode. */
+export function meanThreshold(samples: number[]): number {
+  let acc = 0;
+  for (const s of samples) acc += s;
+  return acc / samples.length;
+}
+
+// Indices of the 20 outer-border modules of the 6×6 grid.
+const BORDER_INDEX: number[] = (() => {
+  const set = new Set<number>();
+  for (let i = 0; i < GRID; i++) {
+    set.add(i);
+    set.add((GRID - 1) * GRID + i);
+    set.add(i * GRID);
+    set.add(i * GRID + (GRID - 1));
+  }
+  return [...set];
+})();
+
+/**
+ * Threshold from the marker's own reference modules: the outer border is known
+ * black and the surrounding quiet zone is known white, so the midpoint of those
+ * two distributions cleanly separates the inner modules — independent of the
+ * global gray histogram (which skews when a marker is mostly one colour). Both
+ * levels use a trimmed mean; returns null when the black/white gap is
+ * implausibly small (e.g. the quad is not actually on a marker), so the caller
+ * falls back to the plateau-centred Otsu.
+ */
+export function borderAwareThreshold(
+  samples: number[],
+  quietWhites: number[],
+): number | null {
+  const borderVals = BORDER_INDEX.map((i) => samples[i]);
+  const black = trimmedMean(borderVals);
+  const white = trimmedMean(quietWhites);
+  if (white - black < 25) return null; // not a plausible black-border-on-white
+  return (black + white) / 2;
+}
+
+/** Binarize a 6×6 gray sample set into a bit grid (1 = black module). When a
+ * `threshold` is given it is used verbatim; otherwise the plateau-centred Otsu. */
+export function grayToBitGrid(samples: number[], threshold?: number): number[][] {
+  const thr = threshold ?? otsu(samples);
   const grid: number[][] = [];
   for (let row = 0; row < GRID; row++) {
     const r: number[] = [];
     for (let col = 0; col < GRID; col++) {
       // Modules at/below the threshold are black (bit 1).
-      r.push(samples[row * GRID + col] <= threshold ? 1 : 0);
+      r.push(samples[row * GRID + col] <= thr ? 1 : 0);
     }
     grid.push(r);
   }
@@ -442,6 +537,137 @@ export function matchMarkerGrid(grid: number[][]): { id: number; rotation: numbe
 }
 
 // ---------------------------------------------------------------------------
+// Subpixel corner refinement (cv2.cornerSubPix-style)
+// ---------------------------------------------------------------------------
+
+/** Central-difference gray gradient at a (sub-pixel) point, via bilinear taps. */
+function grayGradient(gray: GrayImage, x: number, y: number): [number, number] {
+  const gx = (bilinearGray(gray, x + 1, y) - bilinearGray(gray, x - 1, y)) * 0.5;
+  const gy = (bilinearGray(gray, x, y + 1) - bilinearGray(gray, x, y - 1)) * 0.5;
+  return [gx, gy];
+}
+
+/**
+ * Refine one corner to sub-pixel accuracy on the grayscale image. The corner of
+ * a marker's black-on-white border is where every strong local gradient is
+ * orthogonal to the vector from the corner: solve ∑ ggᵀ·p = ∑ ggᵀ·q over a
+ * `win`-radius window (a few Gauss-Newton iterations), exactly the system
+ * cv2.cornerSubPix minimises. Sharpens the corners feeding both the homography
+ * and the 6×6 sampling grid; pure arithmetic, no deps.
+ */
+function refineCorner(
+  gray: GrayImage,
+  cx: number,
+  cy: number,
+  win = 2,
+  iters = 4,
+): Corner {
+  let px = cx;
+  let py = cy;
+  // Cap on total displacement: a genuine subpixel correction is < ~1 module;
+  // a larger jump means the window was ill-conditioned (blur/low contrast), so
+  // we keep the original contour corner rather than trust a wandering estimate.
+  const maxShift = 2.0;
+  for (let it = 0; it < iters; it++) {
+    let a11 = 0;
+    let a12 = 0;
+    let a22 = 0;
+    let b1 = 0;
+    let b2 = 0;
+    for (let dy = -win; dy <= win; dy++) {
+      for (let dx = -win; dx <= win; dx++) {
+        const qx = px + dx;
+        const qy = py + dy;
+        // Gaussian-ish radial weight, zero at the exact centre (cv2 mask).
+        const r2 = dx * dx + dy * dy;
+        if (r2 === 0) continue;
+        const w = Math.exp(-r2 / (2 * (win * win)));
+        const [gx, gy] = grayGradient(gray, qx, qy);
+        const gxx = gx * gx * w;
+        const gxy = gx * gy * w;
+        const gyy = gy * gy * w;
+        a11 += gxx;
+        a12 += gxy;
+        a22 += gyy;
+        b1 += gxx * qx + gxy * qy;
+        b2 += gxy * qx + gyy * qy;
+      }
+    }
+    const det = a11 * a22 - a12 * a12;
+    if (Math.abs(det) < 1e-6) break;
+    const nx = (a22 * b1 - a12 * b2) / det;
+    const ny = (a11 * b2 - a12 * b1) / det;
+    // Reject runaway steps (ill-conditioned window): keep the prior estimate.
+    if (Math.hypot(nx - px, ny - py) > win + 1) break;
+    const moved = Math.hypot(nx - px, ny - py);
+    px = nx;
+    py = ny;
+    if (moved < 0.03) break;
+  }
+  // Discard an implausibly large refinement (weak/ambiguous corner).
+  if (Math.hypot(px - cx, py - cy) > maxShift) return [cx, cy];
+  return [px, py];
+}
+
+/** Refine all four quad corners in place (returns a fresh tuple). */
+export function refineQuad(
+  gray: GrayImage,
+  corners: [Corner, Corner, Corner, Corner],
+): [Corner, Corner, Corner, Corner] {
+  return [
+    refineCorner(gray, corners[0][0], corners[0][1]),
+    refineCorner(gray, corners[1][0], corners[1][1]),
+    refineCorner(gray, corners[2][0], corners[2][1]),
+    refineCorner(gray, corners[3][0], corners[3][1]),
+  ];
+}
+
+// ---------------------------------------------------------------------------
+// Single-quad decode (shared by blind detection and grid-guided redetection)
+// ---------------------------------------------------------------------------
+
+export interface DecodeOptions {
+  /** Trimmed-mean per-module sampling + border-aware thresholding. */
+  robust?: boolean;
+  /** Extra threshold strategies to try after the primary one (guided decode). */
+  extraThresholds?: boolean;
+}
+
+/**
+ * Sample and decode a single quad. In `robust` mode the threshold comes from the
+ * marker's own border/quiet-zone reference (falling back to plateau Otsu); with
+ * `extraThresholds` it additionally retries plain Otsu and the mean threshold —
+ * used by the guided redetection where a marginal marker may need a second look.
+ */
+export function decodeQuad(
+  gray: GrayImage,
+  corners: [Corner, Corner, Corner, Corner],
+  options: DecodeOptions = {},
+): { id: number; rotation: number } | null {
+  const robust = options.robust ?? false;
+  const samples = sampleGridGray(gray, corners, robust);
+
+  const thresholds: number[] = [];
+  if (robust) {
+    const quiet = sampleQuietZoneWhite(gray, corners);
+    const ba = borderAwareThreshold(samples, quiet);
+    if (ba !== null) thresholds.push(ba);
+  }
+  thresholds.push(otsu(samples));
+  if (options.extraThresholds) thresholds.push(meanThreshold(samples));
+
+  const seen = new Set<number>();
+  for (const thr of thresholds) {
+    const key = Math.round(thr);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    const match = matchMarkerGrid(grayToBitGrid(samples, thr));
+    if (match) return match;
+  }
+  return null;
+}
+
+// ---------------------------------------------------------------------------
 // Full detection pipeline
 // ---------------------------------------------------------------------------
 
@@ -452,11 +678,27 @@ export interface DetectOptions {
   approxEpsilonFrac?: number;
   thresholdWindow?: number;
   thresholdC?: number;
+  /** Sub-pixel refine quad corners before sampling/homography (default true). */
+  subpixel?: boolean;
+  /** Trimmed-mean sampling + border-aware threshold (default true). */
+  robustSample?: boolean;
+  /**
+   * Restore the original id-keyed dedupe (keep one marker per id). Only for the
+   * before/after benchmark — it collapses legitimately-repeated ids (the two
+   * CNOT tiles of GHZ-3) and must stay off in production.
+   */
+  legacyIdDedupe?: boolean;
+}
+
+export interface DetectStats {
+  /** Convex 4-vertex quads of sufficient area examined this frame. */
+  candidates: number;
 }
 
 export function detectMarkers(
   image: RgbaImage | GrayImage,
   options: DetectOptions = {},
+  stats?: DetectStats,
 ): DetectedMarker[] {
   const gray: GrayImage = 'data' in image && (image as RgbaImage).data.length ===
     image.width * image.height * 4
@@ -465,6 +707,8 @@ export function detectMarkers(
 
   const minArea = options.minArea ?? 100;
   const epsFrac = options.approxEpsilonFrac ?? 0.05;
+  const subpixel = options.subpixel ?? true;
+  const robust = options.robustSample ?? true;
   const bin = adaptiveThreshold(
     gray,
     options.thresholdWindow ?? 21,
@@ -472,7 +716,7 @@ export function detectMarkers(
   );
   const contours = traceContours(bin, gray.width, gray.height);
 
-  const byId = new Map<number, { marker: DetectedMarker; area: number }>();
+  const found: Array<{ marker: DetectedMarker; area: number }> = [];
   for (const contour of contours) {
     let peri = 0;
     for (let i = 0; i < contour.length; i++) {
@@ -484,11 +728,11 @@ export function detectMarkers(
     if (!isConvex(poly)) continue;
     const area = polygonArea(poly);
     if (area < minArea) continue;
+    if (stats) stats.candidates++;
 
-    const corners = orderCorners(poly);
-    const samples = sampleGridGray(gray, corners);
-    const grid = grayToBitGrid(samples);
-    const match = matchMarkerGrid(grid);
+    let corners = orderCorners(poly);
+    if (subpixel) corners = refineQuad(gray, corners);
+    const match = decodeQuad(gray, corners, { robust });
     if (!match) continue;
 
     const cx = (corners[0][0] + corners[1][0] + corners[2][0] + corners[3][0]) / 4;
@@ -499,9 +743,50 @@ export function detectMarkers(
       corners,
       center: [cx, cy],
     };
-    const prior = byId.get(match.id);
-    if (!prior || area > prior.area) byId.set(match.id, { marker, area });
+    found.push({ marker, area });
   }
 
-  return [...byId.values()].map((v) => v.marker).sort((a, b) => a.id - b.id);
+  if (options.legacyIdDedupe) {
+    const byId = new Map<number, { marker: DetectedMarker; area: number }>();
+    for (const f of found) {
+      const prior = byId.get(f.marker.id);
+      if (!prior || f.area > prior.area) byId.set(f.marker.id, f);
+    }
+    return [...byId.values()].map((v) => v.marker).sort((a, b) => a.id - b.id);
+  }
+  return dedupeByLocation(found);
+}
+
+/**
+ * Collapse detections that are the same physical marker — a marker's border can
+ * spawn a nested contour, and both approximate the same quad. Two detections
+ * coincide when their centres are within `mergeDist` of each other *scaled to
+ * marker size*; the larger-area one wins. Crucially this dedupes by *location*,
+ * not by id: a board legitimately carries several tiles with the same marker id
+ * (e.g. GHZ-3's two CNOT-control and two CNOT-target tiles), which an id-keyed
+ * dedupe would wrongly collapse into one — the root cause of GHZ failing to lock.
+ */
+function dedupeByLocation(
+  found: Array<{ marker: DetectedMarker; area: number }>,
+): DetectedMarker[] {
+  const kept: Array<{ marker: DetectedMarker; area: number }> = [];
+  for (const cand of found) {
+    // Half-diagonal of the candidate quad → a size-relative merge radius.
+    const c = cand.marker.corners;
+    const diag = Math.hypot(c[0][0] - c[2][0], c[0][1] - c[2][1]);
+    const mergeDist = diag * 0.5;
+    let merged = false;
+    for (let i = 0; i < kept.length; i++) {
+      const k = kept[i];
+      const dx = k.marker.center[0] - cand.marker.center[0];
+      const dy = k.marker.center[1] - cand.marker.center[1];
+      if (Math.hypot(dx, dy) <= mergeDist) {
+        if (cand.area > k.area) kept[i] = cand; // keep the larger quad
+        merged = true;
+        break;
+      }
+    }
+    if (!merged) kept.push(cand);
+  }
+  return kept.map((v) => v.marker).sort((a, b) => a.id - b.id);
 }
