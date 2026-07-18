@@ -1,0 +1,6 @@
+{
+  "qubits": 5,
+  "gates": [
+    { "id": "h-0-0", "type": "H", "qubit": 0, "position": 0 }
+  ]
+}

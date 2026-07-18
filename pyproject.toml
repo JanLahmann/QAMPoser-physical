@@ -1,0 +1,13 @@
+# uv workspace root for Entangible (QAMPoser-physical).
+# Virtual root: no [project] here — it only aggregates the member packages.
+# `uv sync` at this root creates .venv and installs all members editable.
+
+[tool.uv.workspace]
+members = ["packages/*"]
+
+[tool.uv.sources]
+qamposer-vision = { workspace = true }
+
+# Dev tooling shared across the workspace, installed by `uv sync` by default.
+[dependency-groups]
+dev = ["pytest>=8"]

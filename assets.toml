@@ -1,0 +1,63 @@
+# Entangible — physical dimensions and styling, single source of truth.
+# Read by qamposer-assets (print) AND qamposer-vision (detection geometry).
+# All lengths in millimetres. See docs/assets-design.md for the rationale.
+
+[aruco]
+dictionary = "DICT_4X4_50"
+
+[tile]
+size = 60.0
+corner_radius = 4.0
+frame_width = 2.5
+band_height = 9.0
+marker_size = 36.0          # 36, not 40: preserves quiet zone + label band; ~10-14 px/bit at design camera geometry
+marker_top = 9.0            # y of marker top edge from tile top
+min_quiet_zone = 6.0        # white margin around marker, no ink allowed inside
+
+[board]
+rows = 5                    # qubits, matches @qamposer/react default maxQubits
+cols = 8
+pitch = 70.0                # cell-center to cell-center
+cell_size = 62.0
+mat_width = 720.0
+mat_height = 500.0
+corner_marker_size = 40.0   # ArUco IDs 0..3 (TL,TR,BR,BL)
+corner_margin = 8.0         # white quiet zone / inset of corner markers from mat edge
+grid_offset_x = 80.0        # left edge of column 1's cell from mat left edge
+grid_offset_y = 105.0       # top edge of row q0's cell from mat top edge
+
+[colors]                    # exactly @qamposer/react GATE_COLORS (CircuitEditor.tsx)
+H = "#fa4d56"
+X = "#002d9c"
+Y = "#9f1853"
+Z = "#33b1ff"
+RX = "#9f1853"
+RY = "#9f1853"
+RZ = "#33b1ff"
+CNOT = "#002d9c"
+
+[colors.neutral]            # IBM Carbon grays for mat structure
+grid = "#c1c7cd"
+wire = "#8d8d8d"
+label = "#525252"
+faint = "#a8a8a8"
+ink = "#161616"
+
+[typography]
+family = "IBM Plex Sans"
+fallback = "Helvetica, Arial, sans-serif"
+band_cap_height = 6.0       # gate label cap height on tiles
+row_label_cap_height = 10.0
+
+[sheets]
+gutter = 5.0
+formats = ["A4", "A3", "Letter"]
+
+[kit]                       # standard booth kit tile quantities
+H = 6
+X = 6
+Y = 4
+Z = 4
+CNOT_control = 4
+CNOT_target = 4
+rotations_each = 1          # one of each RX/RY/RZ x angle variant (12 tiles)

@@ -18,6 +18,7 @@ The design doc is deliberately detailed enough that most milestones are executio
 - **Milestone review gates**: review the full diff at the end of each milestone (M1–M6) before merging; verify against design.md's Verification section.
 - **Hard-debugging escalation**: the known tricky spots — homography/grid-mapping errors, stabilizer hysteresis tuning on real footage, iPhone HTTPS + `getUserMedia` behavior, Pi libcamera/picamera2 integration. Rule of thumb: **if Opus fails twice on the same bug, escalate to Fable.**
 - **Booth UI/UX direction**: one session producing a concrete visual spec (layout, celebration moments, type scale for a screen viewed from ~3 m, attract mode) — then Opus implements the spec.
+- **Graphics design** (per Jan, 2026-07-18): all visual design of the physical kit — tile faces, board mat, cut sheets (docs/assets-design.md + assets.toml) — is Fable work; Opus implements the generator against that spec.
 
 ## Practical workflow
 
