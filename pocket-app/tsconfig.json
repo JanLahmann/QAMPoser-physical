@@ -21,10 +21,20 @@
     "noUnusedParameters": true,
     "noFallthroughCasesInSwitch": true,
 
-    /* Cross-import the display app's quantum engine (single source, no copies). */
+    /* Cross-import the neutral top-level shared/ engine (single source, no
+       copies): @quantum → shared/quantum, @shared → shared. */
     "baseUrl": ".",
     "paths": {
-      "@quantum/*": ["../display-app/src/quantum/*"]
+      "@quantum/*": ["../shared/quantum/*"],
+      "@shared/*": ["../shared/*"],
+      // shared/ has no node_modules of its own — resolve the bare packages it
+      // imports from this app's node_modules so `tsc --noEmit` can type-check
+      // the shared sources. React is mapped to its `@types` declarations (this
+      // build only type-checks; vite does the runtime bundling via dedupe).
+      "react": ["./node_modules/@types/react"],
+      "react/*": ["./node_modules/@types/react/*"],
+      "@qamposer/react": ["./node_modules/@qamposer/react"],
+      "@testing-library/react": ["./node_modules/@testing-library/react"]
     },
 
     "types": ["vitest/globals", "node"]

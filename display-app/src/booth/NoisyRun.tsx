@@ -14,7 +14,7 @@
  */
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { qiskitAdapter, type Circuit, type CircuitRequest } from '@qamposer/react';
-import { statevector, DIM } from '../quantum/statevector';
+import { statevector, DIM } from '@quantum/statevector';
 
 const BACKEND_BASE = '/qamposer-api';
 const HEALTH_URL = '/api/health';

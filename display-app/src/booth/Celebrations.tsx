@@ -11,7 +11,7 @@
  * count at 60 for the Pi 4.
  */
 import { useEffect, useRef, useState } from 'react';
-import type { Celebration } from '../quantum/moments';
+import type { Celebration } from '@quantum/moments';
 
 /** The four gate colours (H / X / Y / Z). */
 const COLORS = ['#fa4d56', '#002d9c', '#9f1853', '#33b1ff'] as const;

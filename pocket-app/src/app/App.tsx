@@ -36,7 +36,8 @@ import { toggleFrozen } from './freeze';
 import { GuidePage } from './GuidePage';
 import { useRoute } from './hashNav';
 import { settingsStore, useSettings, type PanelId } from './settings';
-import { displayCircuit } from './displayWires';
+import { displayCircuit } from '@shared/display/displayWires';
+import { HINTS, HINT_ROTATE_MS } from '@shared/display/hints';
 import { editorFit, editorNaturalHeight, type EditorFit } from './editorFit';
 import {
   golfStep,
@@ -67,13 +68,6 @@ import './pocket.css';
 const BOARD_QUBITS = BOARD.rows;
 const storage = typeof window !== 'undefined' ? window.localStorage : null;
 
-const HINTS = [
-  '● and ⊕ in the same column make a CNOT — entanglement in one move.',
-  'An H tile puts a qubit into superposition — 0 and 1 at once.',
-  'Place tiles left-to-right; each column is one step in time.',
-  'Two entangled qubits always agree — measure one, know the other.',
-];
-const HINT_ROTATE_MS = 7000;
 const DEBUG_THROTTLE_MS = 250;
 
 function StatePanel({ circuit }: { circuit: Circuit }) {

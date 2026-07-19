@@ -3,7 +3,7 @@
 # Trigger is MANUAL (workflow_dispatch) for now — run it from the Actions tab
 # after enabling Pages (Settings → Pages → Source: "GitHub Actions").
 # Switch to a push trigger once the demo is stable, e.g.:
-#   push: { branches: [main], paths: ["pocket-app/**", "display-app/src/quantum/**"] }
+#   push: { branches: [main], paths: ["pocket-app/**", "shared/**"] }
 name: deploy-pocket
 
 on:
@@ -26,10 +26,9 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      # display-app deps too: pocket-app imports display-app/src/quantum/* sources.
-      - name: Install display-app deps
-        run: npm ci
-        working-directory: display-app
+      # SC1: pocket-app imports the neutral top-level shared/ sources via the
+      # @quantum/@shared aliases; @qamposer/react etc. resolve from pocket-app's
+      # own node_modules, so no display-app install is needed here.
       - name: Install and build pocket-app
         run: |
           npm ci

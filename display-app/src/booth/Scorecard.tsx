@@ -7,7 +7,7 @@
  * memory — no localStorage) and the live circuit.
  */
 import type { Circuit } from '@qamposer/react';
-import { LEVELS, evaluate, scoreName, type GolfState } from '../quantum/golf';
+import { LEVELS, evaluate, scoreName, type GolfState } from '@quantum/golf';
 
 export function Scorecard({ state, circuit }: { state: GolfState; circuit: Circuit }) {
   const level = LEVELS[state.levelIndex];

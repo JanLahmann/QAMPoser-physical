@@ -13,44 +13,22 @@
  *   - D = 4 / 5: zero states hidden, > 8 nonzero → sorted top-6 + tail,
  *     a uniform spread → the compact micro-pattern + callout.
  *
- * The chart logic is the shared booth/Pocket rule (`displayOutcomes`); only the
- * class names differ (`bo-` prefix here, `pk-` in Pocket). Columns carry
- * `data-bits`/`data-prob` so the touch-to-inspect layer can read an outcome.
- * Probabilities come from the local statevector (ideal).
+ * The chart math is the shared booth/Pocket rule (`@shared/display/outcomes`);
+ * only the class names differ (`bo-` prefix here, `pk-` in Pocket). Columns
+ * carry `data-bits`/`data-prob` so the touch-to-inspect layer can read an
+ * outcome. Probabilities come from the local statevector (ideal).
  */
 import { useMemo } from 'react';
 import type { Circuit } from '@qamposer/react';
-import { activeQubits, statevector } from '../quantum/statevector';
-
-const TOP_N = 6;
-const ZERO_EPS = 0.001;
-const UNIFORM_EPS = 0.004;
-const MAX_PLAIN = 8;
-
-export interface Outcome {
-  bits: string; // one char per displayed row, top(=q0) first
-  prob: number;
-}
-
-/**
- * Probabilities over the `displayQubits` displayed rows (0..D-1), in basis
- * order 000..111. Pure — the single source of truth for the panel and its
- * parity test. Leftmost bit of `bits` is q0 (the top wire).
- */
-export function displayOutcomes(circuit: Circuit, displayQubits: number): Outcome[] {
-  const D = displayQubits;
-  const sv = statevector(circuit);
-  const probs = new Array<number>(1 << D).fill(0);
-  for (let i = 0; i < sv.length; i++) {
-    const p = sv[i].re * sv[i].re + sv[i].im * sv[i].im;
-    if (p === 0) continue;
-    let idx = 0;
-    // r = 0 (q0) contributes the most-significant bit → top wire on the left.
-    for (let r = 0; r < D; r++) idx = (idx << 1) | ((i >> r) & 1);
-    probs[idx] += p;
-  }
-  return probs.map((prob, idx) => ({ bits: idx.toString(2).padStart(D, '0'), prob }));
-}
+import { activeQubits } from '@quantum/statevector';
+import {
+  displayOutcomes,
+  TOP_N,
+  ZERO_EPS,
+  UNIFORM_EPS,
+  MAX_PLAIN,
+  type Outcome,
+} from '@shared/display/outcomes';
 
 function BitStack({ bits }: { bits: string }) {
   return (

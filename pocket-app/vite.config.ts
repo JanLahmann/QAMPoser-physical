@@ -5,10 +5,12 @@ import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
 
 const here = dirname(fileURLToPath(import.meta.url));
-// The quantum engine is imported straight from the display app — one source of
-// truth, no copies (docs/pocket.md). Vite must be allowed to read outside the
-// pocket-app root, and the `@quantum/*` alias mirrors tsconfig `paths`.
-const quantumDir = resolve(here, '../display-app/src/quantum');
+// The quantum engine and shared display logic live in the neutral top-level
+// shared/ dir — one source of truth, no copies (docs/pocket.md). Vite must be
+// allowed to read outside the pocket-app root; the `@quantum`/`@shared` aliases
+// mirror tsconfig `paths`.
+const sharedDir = resolve(here, '../shared');
+const quantumDir = resolve(sharedDir, 'quantum');
 
 export default defineConfig({
   base: './',
@@ -16,15 +18,20 @@ export default defineConfig({
   resolve: {
     alias: {
       '@quantum': quantumDir,
+      '@shared': sharedDir,
     },
+    // The shared/ dir sits outside this app's root and has no node_modules, so
+    // value imports there (e.g. @testing-library/react in the moved component
+    // tests, or React itself) must resolve from pocket-app/node_modules. dedupe
+    // forces a single copy resolved from this app root.
+    dedupe: ['react', 'react-dom', '@testing-library/react', '@testing-library/dom'],
   },
   server: {
     fs: {
-      // Allow importing display-app/src/quantum/* and the bundled Guide assets
-      // (test-board PNGs + print kit PDF in ../examples) — both outside the app
-      // root. Assets are processed and hashed into dist, so the deploy stays
-      // self-contained.
-      allow: [here, resolve(here, '../display-app'), resolve(here, '../examples')],
+      // Allow importing shared/* and the bundled Guide assets (test-board PNGs +
+      // print kit PDF in ../examples) — both outside the app root. Assets are
+      // processed and hashed into dist, so the deploy stays self-contained.
+      allow: [here, sharedDir, resolve(here, '../examples')],
     },
   },
   build: {
@@ -33,6 +40,15 @@ export default defineConfig({
   test: {
     globals: true,
     environment: 'node',
-    include: ['tests/**/*.test.{ts,tsx}', 'src/**/*.test.{ts,tsx}'],
+    // Pocket is the surviving app (Entangible One), so the co-located tests for
+    // the shared engine + shared display logic run HERE, exactly once. The
+    // display app's vitest `include` of `src/**` naturally excludes them.
+    // Component tests under shared/quantum declare `@vitest-environment jsdom`
+    // per-file (this suite defaults to node).
+    include: [
+      'tests/**/*.test.{ts,tsx}',
+      'src/**/*.test.{ts,tsx}',
+      '../shared/**/*.test.{ts,tsx}',
+    ],
   },
 });

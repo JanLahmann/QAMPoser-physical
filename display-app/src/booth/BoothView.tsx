@@ -21,15 +21,15 @@ import {
   type Circuit,
 } from '@qamposer/react';
 import { useEntangibleState } from '../ws/useEntangibleState';
-import { friendlyWarning } from './warnings';
+import { friendlyWarning } from '@shared/display/warnings';
 import type { ConnectionState } from '../ws/stateSocket';
 import type { CircuitMessage } from '../ws/messages';
-import { activeQubits } from '../quantum/statevector';
+import { activeQubits } from '@quantum/statevector';
 import {
   evaluateMoment,
   initialMomentState,
   type MomentState,
-} from '../quantum/moments';
+} from '@quantum/moments';
 import { shouldAttract } from './attract';
 import { Histogram } from './Histogram';
 import { MessageStrip, type StripMessage } from './MessageStrip';
@@ -39,23 +39,16 @@ import { NoisyRun } from './NoisyRun';
 import { TouchInspector } from './TouchInspector';
 import { Scorecard } from './Scorecard';
 import { isTouchEnabled } from './touch';
-import { displayCircuit } from './displayWires';
+import { displayCircuit } from '@shared/display/displayWires';
 import type { Wires } from '../ws/messages';
-import { QSphereView } from '../quantum/QSphereView';
-import { BlochView } from '../quantum/BlochView';
-import { golfStep, initialGolfState, LEVELS, type GolfState } from '../quantum/golf';
+import { HINTS, HINT_ROTATE_MS } from '@shared/display/hints';
+import { QSphereView } from '@quantum/QSphereView';
+import { BlochView } from '@quantum/BlochView';
+import { golfStep, initialGolfState, LEVELS, type GolfState } from '@quantum/golf';
 import './booth-v2.css';
 
 const BOARD_QUBITS = 5;
 const DEFAULT_PANELS = ['results', 'state', 'qasm'];
-
-const HINTS = [
-  '● and ⊕ in the same column make a CNOT — entanglement in one move.',
-  'An H tile puts a qubit into superposition — 0 and 1 at once.',
-  'Place tiles left-to-right; each column is one step in time.',
-  'Two entangled qubits always agree — measure one, know the other.',
-];
-const HINT_ROTATE_MS = 7000;
 
 /** QASM gate-line tint (gate colors at 60 % on the dark inset). */
 const QASM_TINTS: ReadonlyArray<[RegExp, string]> = [

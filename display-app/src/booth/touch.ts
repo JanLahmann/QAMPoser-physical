@@ -5,7 +5,7 @@
  * Touch is OPTIONAL on the booth and never edits the circuit (the physical
  * table is the editor). The framework-free copy/decision logic
  * (`gateInspectCopy`, `outcomeInspectCopy`, `formatAngle`, `POPOVER_MS`) now
- * lives in `../quantum/inspectCopy` so pocket can share it; it is re-exported
+ * lives in `@quantum/inspectCopy` so pocket can share it; it is re-exported
  * here so existing booth callers (`TouchInspector`, tests) keep importing from
  * `./touch`. Only the booth-specific `?touch` / coarse-pointer enable decision
  * stays local — pocket has touch always on.
@@ -15,7 +15,7 @@ export {
   formatAngle,
   gateInspectCopy,
   outcomeInspectCopy,
-} from '../quantum/inspectCopy';
+} from '@quantum/inspectCopy';
 
 /**
  * Whether touch-to-inspect should be active: explicit `?touch=1` (or `0` to

@@ -100,8 +100,12 @@ export type SidebarSide = 'right' | 'left';
  * How many wires the booth editor + histogram DISPLAY (booth-v2). Purely
  * cosmetic — the physical table and recognized circuit are always five qubits;
  * `compact` shows the used rows (floor 3, auto-grows to 4/5), `all` shows 5.
+ *
+ * The `Wires` union has one canonical home in `@shared/display/wires` (SC1);
+ * re-exported here so protocol consumers keep importing it from `ws/messages`.
  */
-export type Wires = 'compact' | 'all';
+import type { Wires } from '@shared/display/wires';
+export type { Wires };
 
 /**
  * `layout` — panel/mode state (additive, booth-v2).

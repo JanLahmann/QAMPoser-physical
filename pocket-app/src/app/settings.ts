@@ -21,8 +21,12 @@ export type PanelId = 'camera' | 'results' | 'state' | 'qasm';
  * physical table and the recognized circuit are ALWAYS five qubits; this only
  * decides how many wires the editor draws. 'compact' shows the used rows
  * (minimum 3, auto-grows to 4/5 as tiles land on q3/q4), 'all' always shows 5.
+ *
+ * The `Wires` union has one canonical home in `@shared/display/wires` (SC1);
+ * re-exported here so settings consumers keep importing it from `./settings`.
  */
-export type Wires = 'compact' | 'all';
+import type { Wires } from '@shared/display/wires';
+export type { Wires };
 
 export const PANEL_IDS: readonly PanelId[] = ['camera', 'results', 'state', 'qasm'];
 

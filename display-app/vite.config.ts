@@ -1,6 +1,15 @@
 /// <reference types="vitest/config" />
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
+import { fileURLToPath } from 'node:url';
+import { dirname, resolve } from 'node:path';
+
+// The quantum engine and shared display logic live in the neutral top-level
+// shared/ dir (SC1). `@quantum` → shared/quantum, `@shared` → shared; both
+// aliases mirror tsconfig `paths` and match the pocket app's convention.
+const here = dirname(fileURLToPath(import.meta.url));
+const sharedDir = resolve(here, '../shared');
+const quantumDir = resolve(sharedDir, 'quantum');
 
 // The host serves everything from a single HTTPS origin (default :8443).
 // In dev, Vite proxies the API/WS/debug paths to the host so the display app
@@ -15,7 +24,17 @@ const HOST_WS = 'ws://localhost:8443';
 export default defineConfig({
   base: './',
   plugins: [react()],
+  resolve: {
+    alias: {
+      '@quantum': quantumDir,
+      '@shared': sharedDir,
+    },
+  },
   server: {
+    fs: {
+      // Allow importing the sibling shared/ dir (outside the app root).
+      allow: [here, sharedDir],
+    },
     proxy: {
       '/ws': { target: HOST_WS, ws: true, secure: false },
       '/api': { target: HOST_HTTP, changeOrigin: true, secure: false },
