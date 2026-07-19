@@ -201,6 +201,38 @@ Safety rails: dispatch is **disarmed by default**, armed from `/debug`
 cooldown (machine busy = queue nothing, show "machine is busy"); every
 dispatch logged.
 
+### Candidate equipment & scenarios (surveyed 2026-07-19)
+
+Everything below reduces to the `webhook`/`mqtt` adapter + a small device
+bridge — the pack's `program` payload stays generic, no schema changes.
+Ranked by booth fitness:
+
+- **Smart lights** (Philips Hue local REST, WLED REST/MQTT, DMX/Art-Net):
+  outcome recolors the booth — instant, zero consumables. `subset` mode
+  shines: **one lamp per qubit**; an entangled pair is two lamps that always
+  switch together — a room-scale, photographable Bell demo. Candidate for a
+  native adapter (trivial REST).
+- **Receipt printer** (ESC/POS thermal): prints the order card — circuit,
+  outcome, probabilities, Composer-transfer QR. Cheap, fast, every visitor
+  leaves with a keepsake; useful for EVERY pack, drinks or not. Candidate
+  for a native adapter, possibly pulled forward of MX4's machine work.
+- **Candy/gummy dispenser** (Pi + servo per bin): faster and more hygienic
+  than drinks, kid-friendly; `shots` mode = k candies.
+- **Cocktail robot** (CocktailPi has a REST API; DIY pump rigs): `subset`
+  mode maps **one pump per qubit** — a single shot literally mixes the
+  drink, correlations included. The purest form of the ingredients idea.
+- **Marble-run histogram** (servo gates, N clear tubes): each serve routes a
+  marble; repeated serves physically accumulate the measured distribution.
+  DIY build, unmatched pedagogy.
+- **Prize locker / capsule machine** (relay board, one door per outcome);
+  robot-arm bin picking (Dobot/LEGO SPIKE) as the flashy variant.
+- **Quantum jukebox** (Sonos/Spotify API) — outcome picks the track; or
+  MIDI/OSC with one note per qubit (`subset`): entangled notes always sound
+  together.
+- **Pen plotter** (AxiDraw API) drawing the outcome as a take-home sketch.
+- **More Home Connect**: the same OAuth adapter reaches ovens/Cookit —
+  booth-slow, but free if ever wanted.
+
 ## Phases (each independently demoable, repo convention)
 
 1. **MX0 — menu core**: `shared/menu/` types + validator + padding + sampler +
