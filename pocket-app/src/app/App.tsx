@@ -116,6 +116,17 @@ function useFullscreen() {
 }
 
 /**
+ * Stage variant class. In manual "build on screen" mode the stage also holds the
+ * on-screen gate palette above the editor; `pk-stage--manual` scopes the phone
+ * CSS that floors the editor's height so the palette can't collapse it (see
+ * pocket.css). Camera/booth stages get the plain `.pk-stage` sizing. Pure and
+ * exported so the seam is unit-testable without a DOM.
+ */
+export function stageClassName(manual: boolean): string {
+  return manual ? 'pk-stage pk-stage--manual' : 'pk-stage';
+}
+
+/**
  * Vertical auto-fit for the recognized-circuit editor. Measures the stage's
  * available height (ResizeObserver on the editor container) and derives a scale
  * from the editor's natural height (D wires x row height + chrome) so all
@@ -1004,7 +1015,10 @@ export function App() {
                 <span>{warnings.map((w) => friendlyWarning(w)).join('  ·  ')}</span>
               </div>
             )}
-            <section className="pk-stage">
+            {/* `pk-stage--manual` scopes the phone-only editor min-height + no-shrink
+                sizing so the on-screen gate palette can't collapse the editor; camera
+                and booth stages keep the base `.pk-stage` sizing untouched. */}
+            <section className={stageClassName(manual)}>
               {/* Manual mode: the library's own gate palette — the visible
                   build-on-screen affordance (drag a gate onto a wire). */}
               {manual && (

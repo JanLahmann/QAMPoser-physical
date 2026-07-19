@@ -2231,6 +2231,39 @@ body,
     overflow-y: hidden;
   }
 
+  /* Manual "build on screen" mode: the on-screen gate palette (`.pk-manual-palette`,
+     flex: none) sits above the editor inside the stage. With the base phone rules
+     the stage only claims the gap left by the sphere/level/results, so the palette
+     eats it and the editor collapses to ~0 — no wires, gates can't be placed.
+     Compound selector (0,2,0) so it beats the plain `.pk-stage` / `.pk-stage-editor`
+     rules above regardless of source order. Camera/booth stages never get this
+     class, so their sizing is byte-for-byte unchanged. */
+  .pk-stage.pk-stage--manual {
+    /* Grow to fill a roomy stage, but never shrink below content: the editor's
+       min-height is honoured and the extra height is absorbed by `.pk-main`'s
+       vertical scroll (results may drop below the fold in manual mode — allowed;
+       the "results always visible without scrolling" intent is camera-only). */
+    flex: 1 0 auto;
+  }
+
+  .pk-stage--manual .pk-stage-editor {
+    /* Floor for the container the fit-hook measures. The compact 3-wire golf
+       editor is ~360px natural (120px chrome + 3×80px rows); at the 0.45 min
+       scale that needs ~162px to render without internal scroll, so 10.5rem
+       (~168px) shows every wire with touch-sized targets. Taller circuits (4–5
+       wires) fall back to the existing `is-scroll` behaviour within this box. */
+    min-height: 10.5rem;
+  }
+
+  .pk-stage--manual .pk-manual-palette {
+    /* Keep a fully-expanded palette accordion from pushing the editor far below
+       the fold: cap it and let it scroll internally. The editor min-height above
+       is the hard guarantee; this is just so the wires stay within easy reach. */
+    max-height: 50vh;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
   /* The camera panel is the sidebar's first child → the top strip, capped at
      22vh so it never dominates the viewport. */
   .pk-side > *:first-child {
