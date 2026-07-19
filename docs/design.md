@@ -256,6 +256,61 @@ trustworthiness. T3/T4 achieve the same outcome with all credential moments
 on IBM's own domain. Revisit only if IBM ships an OAuth device flow with
 browser CORS.
 
+### In-browser noise model — CONCEPT (task #27; designed 2026-07-19, not yet built)
+
+**Why**: the booth's best teaching moment is "this is why quantum computing is
+hard" — ideal vs realistic results side by side. Today that needs the optional
+Qiskit backend (NoisyRun). A noise model in the browser makes the comparison
+work with ZERO infrastructure — on entangible.org, on a visitor's phone,
+offline — and pairs with the take-home story: *see ideal → see realistic →
+run it for real via the Composer.*
+
+**Method — full density matrix (DECIDED over alternatives).** At ≤5 qubits a
+density matrix is 32×32 ≈ 1k complex numbers (16 KB); a gate application is
+two 32³ complex matrix products ≈ microseconds in JS. So we can afford the
+*honest* simulation: exact, deterministic (no sampling jitter in the bars),
+every standard channel expressible as Kraus operators. Rejected: Monte-Carlo
+Pauli trajectories (sampling noise in the display, many shots for smooth
+bars) and readout-error-only (dishonest — no depth dependence, which is the
+whole lesson).
+
+**Channels** (applied in circuit order):
+- *Depolarizing* after each gate on its qubits: 1-qubit `p1` (default 1e-3),
+  2-qubit `p2` (default 8e-3) — ρ → (1−p)ρ + p/(4^k−1)·Σ PρP over the
+  non-identity Paulis on the k participating qubits.
+- *Amplitude damping + dephasing per MOMENT on every qubit* — including idle
+  ones (pedagogically the point: a deep circuit decays even where nothing
+  happens). Fixed per-moment γ₁ (default 2e-3) and γ_φ (default 2e-3),
+  standard Kraus forms.
+- *Readout error*: per-qubit confusion matrix (default p(flip) 2e-2,
+  optionally asymmetric like real devices), applied classically to the final
+  32-probability vector — cheap and exact.
+
+**Presets** (named, human, the UI surface): `Ideal` (off) · `Today's
+hardware` (defaults above) · `Early device` (~10× worse). The story arc
+"hardware is improving" comes free. Defaults tuned so Bell is visibly
+degraded but clearly Bell, and GHZ-5 shows recognizable-but-eroded peaks —
+tune against the fixtures below before shipping.
+
+**Implementation plan**:
+- `shared/quantum/noise.ts`: `noisyProbabilities(circuit, params): number[]`
+  over a small complex-matrix kernel (Float64Array, interleaved re/im).
+  Refactor `statevector.ts` to EXPORT its gate unitaries (single source of
+  gate definitions for both simulators — no drift).
+- UI: the shared Histogram gains an optional paired-bar series (ideal solid,
+  noisy dimmed/hatched; classPrefix-safe so booth + pocket both get it).
+  Toggle lives in the settings drawer (`noise: 'off'|'today'|'early'`) and a
+  kiosk/layout flag so booth staff can enable it from /debug. Golf stays
+  ideal (targets are pure states). Backend NoisyRun remains, reframed:
+  local = "simulated noise", backend = "real-device noise model / hardware".
+- **Validation**: (1) `noise=0` must reproduce `statevector.ts`
+  probabilities exactly (parity test); (2) closed-form goldens (depolarized
+  Bell, amplitude-damped |1⟩, readout on known vectors); (3) JSON fixtures
+  generated once with Qiskit Aer's density-matrix simulator, TS compares
+  within 1e-9; (4) invariants: trace 1, Hermitian, probs sum to 1.
+- Phasing: NM0 math core + parity/goldens → NM1 histogram pairing + presets
+  + settings → NM2 kiosk flag + docs + Guide sentence. Est. ~300 lines + tests.
+
 ### Quantum Golf — DECIDED (per Jan 2026-07-19, build today)
 
 Unifies the former "Bloch Golf" and "Q-sphere Golf" ideas under one name and
