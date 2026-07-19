@@ -34,7 +34,9 @@ import { getOperatorKey, withKey } from '@shared/ws/operatorKey';
 import { framesSocketUrl } from '@shared/capture/streamController';
 import type { FrameStreamerStatus } from '@shared/capture/frameStreamer';
 import { useCamera } from './useCamera';
-import { pinchZoom, pointerDistance, type Point as PinchPoint } from './zoom';
+import { pinchZoom, pointerDistance, cropRect, type Point as PinchPoint } from './zoom';
+import { detectMatRoi } from '../vision/matDetect';
+import type { Rect } from '@shared/capture/matRoi';
 import { MessageStrip, type StripMessage } from './MessageStrip';
 import { Celebrations, LOW_POWER_PARTICLES, type CelebrationRequest } from './Celebrations';
 import { ResultsHistogram } from './ResultsHistogram';
@@ -262,6 +264,48 @@ function drawOverlay(
   ctx.fillText(line, pad, pad);
 }
 
+/**
+ * Draw the just-detected mat ROI as a dashed rectangle over the camera preview
+ * (task #34) — a ~1.5 s confirmation before the stream locks to it. The ROI is in
+ * source px; the preview shows the current `crop` (zoom region) upscaled to fill
+ * the frame, so we map ROI → that displayed space, matching `drawOverlay`'s
+ * convention (canvas sized to the full frame, CSS-scaled over the video).
+ */
+function drawMatOverlay(
+  canvas: HTMLCanvasElement,
+  roi: Rect,
+  crop: { sx: number; sy: number; sw: number; sh: number },
+  w: number,
+  h: number,
+): void {
+  if (canvas.width !== w) canvas.width = w;
+  if (canvas.height !== h) canvas.height = h;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return;
+  ctx.clearRect(0, 0, w, h);
+  const kx = w / crop.sw;
+  const ky = h / crop.sh;
+  const x = (roi.sx - crop.sx) * kx;
+  const y = (roi.sy - crop.sy) * ky;
+  const rw = roi.sw * kx;
+  const rh = roi.sh * ky;
+  // Dim everything outside the ROI so the kept region reads instantly.
+  ctx.fillStyle = 'rgba(9, 11, 16, 0.55)';
+  ctx.fillRect(0, 0, w, h);
+  ctx.clearRect(x, y, rw, rh);
+  ctx.lineWidth = Math.max(2, w / 320);
+  ctx.setLineDash([Math.max(6, w / 90), Math.max(4, w / 140)]);
+  ctx.strokeStyle = 'rgba(47, 191, 113, 0.95)';
+  ctx.strokeRect(x, y, rw, rh);
+}
+
+/** Clear a canvas used only for the transient mat-ROI overlay. */
+function clearCanvas(canvas: HTMLCanvasElement | null): void {
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  ctx?.clearRect(0, 0, canvas.width, canvas.height);
+}
+
 /** Status-pill label + style hook for the CAMERA role's streaming connection. */
 function cameraStreamPill(status: FrameStreamerStatus | null): { label: string; cls: string } {
   if (!status || status.connection === 'connecting')
@@ -305,8 +349,13 @@ export function App() {
   const [frozen, setFrozen] = useState(false);
   // CAMERA role streaming status (fps + connection) for the status pill.
   const [streamStatus, setStreamStatus] = useState<FrameStreamerStatus | null>(null);
+  // CAMERA role, "Frame the mat" lock (task #34): the source-space mat ROI the
+  // stream is locked to, or null (full/zoomed frame). Session-only — a physical
+  // re-aim invalidates it, so it deliberately persists nothing.
+  const [matLock, setMatLock] = useState<Rect | null>(null);
 
   const overlayRef = useRef<HTMLCanvasElement>(null);
+  const matOverlayTimerRef = useRef<number | null>(null);
   const fpsRef = useRef(0);
   const momentStateRef = useRef<MomentState>(initialMomentState);
   const prevCircuitRef = useRef<Circuit>(createDefaultCircuit(BOARD_QUBITS));
@@ -441,8 +490,60 @@ export function App() {
     cameraId: settings.cameraId,
     onCameraFallback,
     onFrame: cameraRole ? onFrame : undefined,
+    // Only the camera role streams, so only it can lock to a mat ROI.
+    matCrop: cameraRole ? matLock : null,
   });
   fpsRef.current = camera.fps;
+
+  // Clear the transient mat-ROI overlay + its pending timer.
+  const clearMatOverlay = useCallback(() => {
+    if (matOverlayTimerRef.current !== null) {
+      window.clearTimeout(matOverlayTimerRef.current);
+      matOverlayTimerRef.current = null;
+    }
+    clearCanvas(overlayRef.current);
+  }, []);
+
+  // "Frame the mat": one-shot detect on the current (zoomed) frame, then lock the
+  // stream to the mat ROI. On success flash the ROI for ~1.5 s; on failure toast
+  // and stay unlocked. Re-running re-detects (table nudged).
+  const handleFrameMat = useCallback(() => {
+    const video = camera.videoRef.current;
+    if (!video || video.readyState < 2) return;
+    const w = video.videoWidth;
+    const h = video.videoHeight;
+    if (!(w > 0 && h > 0)) return;
+    // Detect within whatever the sink currently streams: the digital-zoom crop
+    // (native zoom already baked into the sensor pixels, so its crop is full).
+    const digitalZoom = camera.zoomMode === 'digital' ? camera.zoom : 1;
+    const crop = cropRect(digitalZoom, w, h);
+    const result = detectMatRoi(video, crop);
+    if (!result.ok) {
+      pushStrip("Can't find the mat — all four corners in view?");
+      return;
+    }
+    setMatLock(result.roi);
+    if (overlayRef.current) drawMatOverlay(overlayRef.current, result.roi, crop, w, h);
+    if (matOverlayTimerRef.current !== null) window.clearTimeout(matOverlayTimerRef.current);
+    matOverlayTimerRef.current = window.setTimeout(() => {
+      matOverlayTimerRef.current = null;
+      clearCanvas(overlayRef.current);
+    }, 1500);
+  }, [camera.videoRef, camera.zoom, camera.zoomMode, pushStrip]);
+
+  const handleUnlockMat = useCallback(() => {
+    setMatLock(null);
+    clearMatOverlay();
+  }, [clearMatOverlay]);
+
+  // Drop any mat lock (and its overlay) whenever streaming isn't live — leaving
+  // the camera role or stopping the camera; a re-aim would invalidate it anyway.
+  useEffect(() => {
+    if (!cameraRole || camera.status !== 'running') {
+      setMatLock(null);
+      clearMatOverlay();
+    }
+  }, [cameraRole, camera.status, clearMatOverlay]);
 
   // Camera controls read through refs so the source/camera-switch effects can
   // key on `boothUrl`/`connected` alone (camera.start's identity changes with
@@ -759,6 +860,9 @@ export function App() {
               frozen={frozen}
               onToggleFreeze={toggleFreeze}
               stream={streamStatus}
+              onFrameMat={handleFrameMat}
+              matLocked={matLock !== null}
+              onUnlockMat={handleUnlockMat}
             />
           </section>
         </main>
@@ -889,6 +993,9 @@ function CameraPanel({
   frozen,
   onToggleFreeze,
   stream = null,
+  onFrameMat,
+  matLocked = false,
+  onUnlockMat,
 }: {
   camera: ReturnType<typeof useCamera>;
   overlayRef: React.RefObject<HTMLCanvasElement>;
@@ -902,10 +1009,19 @@ function CameraPanel({
    * to booth" instead of the board-lock prompt. `null` → normal detection panel.
    */
   stream?: FrameStreamerStatus | null;
+  /**
+   * CAMERA role, "Frame the mat" (task #34): when provided, a control appears to
+   * one-shot detect the mat and lock the stream to it. `matLocked` swaps in the
+   * "Mat only" badge + hides the zoom pill; `onUnlockMat` clears the lock.
+   */
+  onFrameMat?: () => void;
+  matLocked?: boolean;
+  onUnlockMat?: () => void;
 }) {
   const { status, error, fps, videoRef, zoom, zoomRange, previewScale, setZoom, stepZoom, resetZoom } =
     camera;
   const streaming = stream != null;
+  const canFrameMat = onFrameMat != null;
 
   // Pinch-to-zoom (two pointers) + double-tap-to-reset on the preview.
   const pointersRef = useRef<Map<number, PinchPoint>>(new Map());
@@ -982,13 +1098,19 @@ function CameraPanel({
           <FullscreenButton variant="cam" />
           <span className="pk-cam-fps">{streaming ? Math.round(stream!.fps) : fps} fps</span>
           <FreezePill frozen={frozen} onToggle={onToggleFreeze} />
-          <ZoomPill
-            zoom={zoom}
-            min={zoomRange.min}
-            max={zoomRange.max}
-            onIn={() => stepZoom(1)}
-            onOut={() => stepZoom(-1)}
-          />
+          {canFrameMat && matLocked && <MatBadge onUnlock={onUnlockMat} />}
+          {/* Re-framing needs a live frame, so hide it while frozen (pump paused). */}
+          {canFrameMat && !frozen && <MatButton locked={matLocked} onFrame={onFrameMat!} />}
+          {/* Locked → the mat crop replaces the digital zoom, so the pill hides. */}
+          {!matLocked && (
+            <ZoomPill
+              zoom={zoom}
+              min={zoomRange.min}
+              max={zoomRange.max}
+              onIn={() => stepZoom(1)}
+              onOut={() => stepZoom(-1)}
+            />
+          )}
           {frozen ? (
             <div className="pk-frozen-msg" role="status">
               <span aria-hidden="true">❄</span> Frozen — {streaming ? 'stream paused' : 'circuit locked'}
@@ -1057,6 +1179,50 @@ function FreezePill({ frozen, onToggle }: { frozen: boolean; onToggle: () => voi
       </span>
       <span className="pk-freeze__label">{frozen ? 'Frozen' : 'Freeze'}</span>
     </button>
+  );
+}
+
+/** "Frame the mat" trigger — top-centre pill; re-tapping while locked re-detects. */
+function MatButton({ locked, onFrame }: { locked: boolean; onFrame: () => void }) {
+  const swallow = (e: React.PointerEvent) => e.stopPropagation();
+  const label = locked ? 'Re-frame the mat' : 'Frame the mat';
+  return (
+    <button
+      type="button"
+      className={`pk-mat-btn ${locked ? 'is-locked' : ''}`}
+      aria-label={label}
+      title={label}
+      onClick={onFrame}
+      onPointerDown={swallow}
+      onPointerUp={swallow}
+    >
+      <span className="pk-mat-btn__glyph" aria-hidden="true">
+        ▣
+      </span>
+      <span className="pk-mat-btn__label">{label}</span>
+    </button>
+  );
+}
+
+/** "Mat only" badge (top-left) shown while locked; its ✕ returns the full frame. */
+function MatBadge({ onUnlock }: { onUnlock?: () => void }) {
+  const swallow = (e: React.PointerEvent) => e.stopPropagation();
+  return (
+    <div className="pk-mat-badge" role="status" onPointerDown={swallow} onPointerUp={swallow}>
+      <span className="pk-mat-badge__glyph" aria-hidden="true">
+        ▣
+      </span>
+      <span>Mat only</span>
+      <button
+        type="button"
+        className="pk-mat-badge__x"
+        aria-label="Unlock — stream the full frame"
+        title="Unlock — stream the full frame"
+        onClick={onUnlock}
+      >
+        ✕
+      </button>
+    </div>
   );
 }
 

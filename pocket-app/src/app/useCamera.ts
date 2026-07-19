@@ -24,6 +24,8 @@ import {
   stepZoom as stepZoomValue,
   type ZoomRange,
 } from './zoom';
+import { frameStreamCrop } from './matStream';
+import type { Rect } from '@shared/capture/matRoi';
 
 export type CameraStatus = 'idle' | 'starting' | 'running' | 'error';
 
@@ -77,6 +79,13 @@ interface Options {
    * streamed frame IS what the preview shows. `undefined` → normal detection.
    */
   onFrame?: (canvas: HTMLCanvasElement) => void;
+  /**
+   * CAMERA role, mat lock (task #34): when set, the streaming sink draws THIS
+   * source-space crop (the detected mat ROI) instead of the digital-zoom crop —
+   * only the mat region is transferred + analysed. Replaces the digital zoom
+   * while locked; `null`/`undefined` streams the full/zoomed frame as before.
+   */
+  matCrop?: Rect | null;
 }
 
 const TARGET_PROCESS_MS = 45; // aim ~20 detections/s; skip frames to hold it
@@ -89,9 +98,13 @@ export function useCamera({
   cameraId = null,
   onCameraFallback,
   onFrame,
+  matCrop = null,
 }: Options): CameraState {
   const onFrameRef = useRef(onFrame);
   onFrameRef.current = onFrame;
+  // Mat lock, read by the rAF sink so a lock takes effect without re-arming.
+  const matCropRef = useRef<Rect | null>(matCrop);
+  matCropRef.current = matCrop;
   // Dedicated streaming canvas (kept separate from the detection canvas, which
   // uses a `willReadFrequently` context) so the two modes never fight over one
   // canvas's context type.
@@ -167,9 +180,11 @@ export function useCamera({
       rafRef.current = requestAnimationFrame(loop);
       return;
     }
-    // CAMERA role: stream the zoomed crop instead of detecting. Drawn at native
+    // CAMERA role: stream the current crop instead of detecting. Drawn at native
     // pixel density (canvas sized to the crop, like `/capture`) so the streamed
-    // JPEG *is* the zoomed region; the sink paces itself, so we offer every rAF.
+    // JPEG *is* the shown region; the sink paces itself, so we offer every rAF.
+    // The crop is the mat ROI while locked (task #34), else the digital-zoom
+    // crop — freeze already gated the loop above, so it pauses either way.
     const sink = onFrameRef.current;
     if (sink) {
       const w = video.videoWidth;
@@ -177,7 +192,7 @@ export function useCamera({
       if (w > 0 && h > 0) {
         if (!streamCanvasRef.current) streamCanvasRef.current = document.createElement('canvas');
         const canvas = streamCanvasRef.current;
-        const { sx, sy, sw, sh } = cropRect(digitalZoomRef.current, w, h);
+        const { sx, sy, sw, sh } = frameStreamCrop(matCropRef.current, digitalZoomRef.current, w, h);
         if (canvas.width !== sw) canvas.width = sw;
         if (canvas.height !== sh) canvas.height = sh;
         const ctx = canvas.getContext('2d');

@@ -168,6 +168,21 @@ only phone-camera path).
   push source and lists the phone in its `/debug` camera fleet. A **Streaming to
   booth · N fps** pill + **Stop** show; Stop returns to standalone (the still-
   running camera resumes the local pipeline).
+- **Frame the mat** (booth-table setup helper; task #34): with a dedicated
+  overhead camera you rarely want the whole scene on the wire. Tapping **▣ Frame
+  the mat** runs the local ArUco detector ONCE, takes the bounding box of the four
+  corner markers (ids 0-3) expanded by a ~12 % margin (`@shared/capture/matRoi` —
+  the margin keeps every fiducial *and its quiet zone* inside the crop so the
+  host homography still locks), flashes the region for ~1.5 s, then locks the
+  stream to it: the `onFrame` sink draws that mat ROI instead of the full/zoomed
+  frame. Wins: **bandwidth** (a remote camera streams only the mat), **detection
+  speed** (host works a smaller frame), and **privacy** (hands/faces outside the
+  mat never leave the phone). A **Mat only** badge (with ✕ to unlock) shows and
+  the zoom pill hides — the mat crop replaces digital zoom while locked. It is a
+  rough axis-aligned crop, not a warp; re-tap to re-detect after a nudge. The lock
+  is session-only (a physical re-aim invalidates it) and freeze still pauses the
+  pump regardless. On failure (fewer than three corners in view) a toast asks for
+  all four corners and the stream stays unlocked.
 - **Security**: operator-gated end to end. The key arrives via `?key=` (shared
   `@shared/ws/operatorKey`), is stored in `localStorage`, and is immediately
   scrubbed from the address bar (`history.replaceState`) — never rendered into

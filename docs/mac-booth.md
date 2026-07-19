@@ -65,7 +65,9 @@ uv run qamposer-physical qr --no-tls           # http URL variant
 The staff QR now opens the **pocket app in its camera role**
 (`/pocket?connect=1&role=camera&key=…`): the phone streams its camera to the
 booth with pocket's richer camera UI (pinch/step zoom, freeze), while the booth
-does the detection. The QR carries the booth's **operator token** as `?key=…`,
+does the detection. With a fixed overhead camera, tap **▣ Frame the mat** once to
+crop the stream to just the printed mat (saves bandwidth, speeds detection, keeps
+anything outside the mat off the wire); ✕ on the **Mat only** badge unlocks it. The QR carries the booth's **operator token** as `?key=…`,
 so the phone arrives pre-authorized for the token-gated `/ws/frames` intake and
 connects to `/ws/state` as an operator `camera` (no typing; the key is stored
 and immediately scrubbed from the address bar). (The former display-app

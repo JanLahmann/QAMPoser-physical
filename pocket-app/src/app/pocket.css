@@ -595,6 +595,76 @@ body,
   z-index: 3;
 }
 
+/* "Frame the mat" trigger (top-centre pill; task #34). */
+.pk-mat-btn {
+  position: absolute;
+  left: 50%;
+  top: 0.5rem;
+  transform: translateX(-50%);
+  z-index: 3;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  min-height: 40px;
+  padding: 0 0.9rem;
+  background: rgba(15, 17, 23, 0.82);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  color: var(--text);
+  font-family: var(--sans);
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.pk-mat-btn__glyph {
+  font-size: 0.95rem;
+  line-height: 1;
+  color: rgb(47, 191, 113);
+}
+
+/* "Mat only" lock badge (top-left) — accent-green so the cropped state is clear. */
+.pk-mat-badge {
+  position: absolute;
+  left: 0.5rem;
+  top: 0.5rem;
+  z-index: 3;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  min-height: 40px;
+  padding: 0 0.35rem 0 0.8rem;
+  background: rgba(15, 17, 23, 0.82);
+  border: 1px solid rgba(47, 191, 113, 0.7);
+  border-radius: 999px;
+  color: var(--text);
+  font-family: var(--sans);
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+.pk-mat-badge__glyph {
+  font-size: 0.9rem;
+  line-height: 1;
+  color: rgb(47, 191, 113);
+}
+.pk-mat-badge__x {
+  width: 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  margin-left: 0.15rem;
+  font-size: 0.9rem;
+  color: var(--text);
+  background: transparent;
+  border: none;
+  border-radius: 999px;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.pk-mat-badge__x:active {
+  background: var(--bg-inset);
+}
+
 /* ---- tap-to-inspect popover (pk tokens) ------------------------------ */
 .pk-inspect {
   position: fixed;
