@@ -97,6 +97,8 @@ export function ResultsHistogram({
                 <div
                   className={`pk-h-col ${dim ? 'is-dim' : ''}`}
                   key={o.bits}
+                  data-bits={o.bits}
+                  data-prob={o.prob}
                   title={`${o.bits}: ${(o.prob * 100).toFixed(1)}%`}
                 >
                   <span className="pk-h-pct">
@@ -145,7 +147,7 @@ export function ResultsHistogram({
         <div className="pk-well">
           <div className="pk-h-plot is-micro">
             {outcomes.map((o) => (
-              <div className="pk-h-col" key={o.bits}>
+              <div className="pk-h-col" key={o.bits} data-bits={o.bits} data-prob={o.prob}>
                 <div className="pk-h-bar" style={{ height: '36%' }} />
               </div>
             ))}
@@ -180,6 +182,8 @@ export function ResultsHistogram({
             <div
               className="pk-h-col"
               key={o.bits}
+              data-bits={o.bits}
+              data-prob={o.prob}
               title={`${o.bits}: ${(o.prob * 100).toFixed(1)}%`}
             >
               <span className="pk-h-pct">{o.prob >= 0.05 ? `${Math.round(o.prob * 100)}%` : ''}</span>

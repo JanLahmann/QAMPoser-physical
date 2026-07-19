@@ -11,6 +11,7 @@
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { PocketPipeline, type FrameResult } from '../vision/pipeline';
+import { applyVideoFreeze, shouldProcess, videoFreezeAction } from './freeze';
 import {
   applyNativeZoom,
   clampZoom,
@@ -50,14 +51,22 @@ interface Options {
   onResult: (result: FrameResult, video: HTMLVideoElement) => void;
   /** Low-power mode: process at most every 2nd frame (docs/pocket.md). */
   lowPower?: boolean;
+  /**
+   * Freeze: when true the rAF loop stops feeding frames to the pipeline (no new
+   * detections / circuit changes) and the preview <video> is paused so the
+   * picture visibly holds. Session-momentary; the stream itself stays live.
+   */
+  paused?: boolean;
 }
 
 const TARGET_PROCESS_MS = 45; // aim ~20 detections/s; skip frames to hold it
 const ZOOM_STORAGE_KEY = 'entangible.pocket.zoom';
 
-export function useCamera({ onResult, lowPower = false }: Options): CameraState {
+export function useCamera({ onResult, lowPower = false, paused = false }: Options): CameraState {
   const lowPowerRef = useRef(lowPower);
   lowPowerRef.current = lowPower;
+  const pausedRef = useRef(paused);
+  pausedRef.current = paused;
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -108,6 +117,12 @@ export function useCamera({ onResult, lowPower = false }: Options): CameraState 
   const loop = useCallback(() => {
     const video = videoRef.current;
     if (!video || video.readyState < 2) {
+      rafRef.current = requestAnimationFrame(loop);
+      return;
+    }
+    // Frozen: keep the rAF alive (so unfreeze resumes cleanly) but feed no
+    // frames to the pipeline — the last detection / circuit and overlay hold.
+    if (!shouldProcess(pausedRef.current)) {
       rafRef.current = requestAnimationFrame(loop);
       return;
     }
@@ -263,6 +278,12 @@ export function useCamera({ onResult, lowPower = false }: Options): CameraState 
   }, [status, loop, requestWakeLock]);
 
   useEffect(() => () => stop(), [stop]);
+
+  // Freeze/unfreeze the preview picture: pause the <video> while frozen, resume
+  // it while live. Session-momentary — the MediaStream keeps running underneath.
+  useEffect(() => {
+    applyVideoFreeze(videoRef.current, videoFreezeAction(paused, status === 'running'));
+  }, [paused, status]);
 
   // ---- zoom controls ----------------------------------------------------
   const setZoom = useCallback(

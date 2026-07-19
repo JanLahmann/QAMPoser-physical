@@ -30,6 +30,8 @@ import { BlochView } from '@quantum/BlochView';
 import { Scorecard } from './Scorecard';
 import { DebugPanel } from './DebugPanel';
 import { SettingsControl } from './SettingsDrawer';
+import { TouchInspector } from './TouchInspector';
+import { toggleFrozen } from './freeze';
 import { GuidePage } from './GuidePage';
 import { useRoute } from './hashNav';
 import { useSettings, type PanelId } from './settings';
@@ -284,6 +286,8 @@ export function App() {
   const [hintIndex, setHintIndex] = useState(0);
   const [golfState, setGolfState] = useState<GolfState>(() => initialGolfState(loadBest(storage)));
   const [, setDebugTick] = useState(0);
+  // Freeze: session-momentary; starts unfrozen and persists nothing.
+  const [frozen, setFrozen] = useState(false);
 
   const overlayRef = useRef<HTMLCanvasElement>(null);
   const fpsRef = useRef(0);
@@ -364,8 +368,31 @@ export function App() {
     [pushStrip],
   );
 
-  const camera = useCamera({ onResult, lowPower: settings.lowpower });
+  const camera = useCamera({ onResult, lowPower: settings.lowpower, paused: frozen });
   fpsRef.current = camera.fps;
+
+  const toggleFreeze = useCallback(() => setFrozen((f) => toggleFrozen(f)), []);
+
+  // Freeze is only meaningful while the camera runs; drop it whenever the camera
+  // is not running so it always starts unfrozen on the next start.
+  useEffect(() => {
+    if (camera.status !== 'running') setFrozen(false);
+  }, [camera.status]);
+
+  // Keyboard: 'f' toggles freeze (ignore when typing or with modifiers).
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'f' && e.key !== 'F') return;
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
+      const el = e.target as HTMLElement | null;
+      if (el && (el.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName))) return;
+      if (camera.status !== 'running') return;
+      e.preventDefault();
+      toggleFreeze();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [toggleFreeze, camera.status]);
 
   // Latch "the camera has run once" — gates the iPhone install hint so it never
   // clutters the very first impression.
@@ -432,6 +459,8 @@ export function App() {
       overlayRef={overlayRef}
       boardLocked={boardLocked}
       visible={hasPanel('camera')}
+      frozen={frozen}
+      onToggleFreeze={toggleFreeze}
     />
   );
 
@@ -561,6 +590,10 @@ export function App() {
         maxParticles={settings.lowpower ? LOW_POWER_PARTICLES : undefined}
       />
 
+      {/* Tap-to-inspect: always on (a phone is a touch device). Reads the live
+          5-qubit circuit; its gates array is identical to the displayed one. */}
+      <TouchInspector circuit={circuit} />
+
       {/* The Guide renders as an overlay over the still-mounted app, so an active
           camera stream keeps running while it is open (docs/pocket.md). */}
       {route === 'guide' && <GuidePage />}
@@ -573,11 +606,15 @@ function CameraPanel({
   overlayRef,
   boardLocked,
   visible,
+  frozen,
+  onToggleFreeze,
 }: {
   camera: ReturnType<typeof useCamera>;
   overlayRef: React.RefObject<HTMLCanvasElement>;
   boardLocked: boolean;
   visible: boolean;
+  frozen: boolean;
+  onToggleFreeze: () => void;
 }) {
   const { status, error, fps, videoRef, zoom, zoomRange, previewScale, setZoom, stepZoom, resetZoom } =
     camera;
@@ -645,7 +682,7 @@ function CameraPanel({
       <div className="pk-label">Camera</div>
       {status === 'running' ? (
         <div
-          className="pk-cam"
+          className={`pk-cam ${frozen ? 'is-frozen' : ''}`}
           onPointerDown={onPointerDown}
           onPointerMove={onPointerMove}
           onPointerUp={onPointerUp}
@@ -656,6 +693,7 @@ function CameraPanel({
           <canvas ref={overlayRef} className="pk-overlay" />
           <FullscreenButton variant="cam" />
           <span className="pk-cam-fps">{fps} fps</span>
+          <FreezePill frozen={frozen} onToggle={onToggleFreeze} />
           <ZoomPill
             zoom={zoom}
             min={zoomRange.min}
@@ -663,8 +701,14 @@ function CameraPanel({
             onIn={() => stepZoom(1)}
             onOut={() => stepZoom(-1)}
           />
-          {!boardLocked && (
-            <div className="pk-cam-hint">Point at the board — all four corners in view</div>
+          {frozen ? (
+            <div className="pk-frozen-msg" role="status">
+              <span aria-hidden="true">❄</span> Frozen — circuit locked
+            </div>
+          ) : (
+            !boardLocked && (
+              <div className="pk-cam-hint">Point at the board — all four corners in view</div>
+            )
           )}
         </div>
       ) : (
@@ -685,6 +729,30 @@ function CameraPanel({
         </div>
       )}
     </div>
+  );
+}
+
+/** Freeze toggle — a ≥44px pill on the camera strip (bottom-left). */
+function FreezePill({ frozen, onToggle }: { frozen: boolean; onToggle: () => void }) {
+  // Swallow pointer events so the pinch handler on the preview never sees them.
+  const swallow = (e: React.PointerEvent) => e.stopPropagation();
+  const label = frozen ? 'Unfreeze camera' : 'Freeze camera';
+  return (
+    <button
+      type="button"
+      className={`pk-freeze ${frozen ? 'is-frozen' : ''}`}
+      aria-label={label}
+      aria-pressed={frozen}
+      title={label}
+      onClick={onToggle}
+      onPointerDown={swallow}
+      onPointerUp={swallow}
+    >
+      <span className="pk-freeze__glyph" aria-hidden="true">
+        ❄
+      </span>
+      <span className="pk-freeze__label">{frozen ? 'Frozen' : 'Freeze'}</span>
+    </button>
   );
 }
 

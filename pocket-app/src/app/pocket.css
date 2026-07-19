@@ -335,6 +335,96 @@ body,
   color: var(--text);
 }
 
+/* Freeze toggle (bottom-left pill over the preview; ≥44px for a thumb). */
+.pk-freeze {
+  position: absolute;
+  left: 0.5rem;
+  bottom: 0.5rem;
+  z-index: 3;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  min-height: 44px;
+  padding: 0 0.85rem;
+  background: rgba(15, 17, 23, 0.82);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  color: var(--text);
+  font-family: var(--sans);
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.pk-freeze__glyph {
+  font-size: 0.95rem;
+  line-height: 1;
+}
+
+/* Frozen: the pill fills with the accent so the state is unmistakable. */
+.pk-freeze.is-frozen {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
+/* Frozen preview: a thin accent border rings the whole camera strip. */
+.pk-cam.is-frozen {
+  border-color: var(--accent);
+  box-shadow: inset 0 0 0 2px var(--accent);
+}
+
+/* "Frozen — circuit locked" banner (top-centre of the frozen preview). */
+.pk-frozen-msg {
+  position: absolute;
+  left: 50%;
+  top: 0.6rem;
+  transform: translateX(-50%);
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  background: var(--accent);
+  color: #fff;
+  border-radius: 999px;
+  padding: 0.35rem 0.9rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+  white-space: nowrap;
+  z-index: 3;
+}
+
+/* ---- tap-to-inspect popover (pk tokens) ------------------------------ */
+.pk-inspect {
+  position: fixed;
+  transform: translate(-50%, calc(-100% - 0.7rem));
+  max-width: min(22rem, 90vw);
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 0.6rem 0.85rem;
+  font-size: 0.9rem;
+  line-height: 1.35;
+  color: var(--text);
+  box-shadow: 0 0.5rem 1.6rem rgba(0, 0, 0, 0.45);
+  z-index: 30;
+  pointer-events: none;
+  animation: pk-inspect-in 0.16s ease-out;
+}
+
+.pk-inspect.is-below {
+  transform: translate(-50%, 0.7rem);
+}
+
+@keyframes pk-inspect-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
 /* Start card (idle / secure-context error). */
 .pk-startcard {
   text-align: center;
@@ -1797,6 +1887,8 @@ body,
   display: none;
 }
 
-.pk-stage-editor .circuit-editor__canvas {
-  pointer-events: none;
-}
+/* Taps on the canvas are LEFT enabled so tap-to-inspect can hit a gate (the
+   booth-consistent approach — the booth taps the live editor). The editor is
+   controlled with no `onCircuitChange`, so a stray drag no-ops and reverts, and
+   the next recognised frame re-asserts the circuit anyway; a genuine tap never
+   drags. The toolbar/measurement chrome above stays hidden. */
