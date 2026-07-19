@@ -20,6 +20,12 @@
   --accent: #0f62fe;
   --bars: #33b1ff;
   --entangle: #7a5cff;
+  /* Text-safe variants (WCAG AA on --bg/--bg-panel). --accent (3.8:1) and
+     --entangle (4.3:1) are fills/borders/large-display colors only; body-size
+     TEXT in those hues must use these instead. --link is IBM Blue 40 (~8:1),
+     --entangle-text ~6.5:1. */
+  --link: #78a9ff;
+  --entangle-text: #9b85ff;
   --ok: #2fbf71;
   --warn: #f1c21b;
   --danger: #e5484d;
