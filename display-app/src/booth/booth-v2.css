@@ -6,20 +6,12 @@
  * overrides of M3 overlay classes win the cascade.
  */
 
+/*
+ * The design tokens (--bg, --bars, --entangle, …) live in the shared
+ * `@shared/tokens.css` (SC2, imported first in main.tsx); `.bo` inherits them
+ * from :root — resolved values are unchanged from when they were declared here.
+ */
 .bo {
-  --bg: #0f1117;
-  --bg-panel: #161a22;
-  --bg-inset: #11141b;
-  --border: #262b36;
-  --text: #e6e9ef;
-  --muted: #8a91a0;
-  --faint: #5c6370;
-  --accent: #0f62fe;
-  --bars: #33b1ff;
-  --entangle: #7a5cff;
-  --ok: #2fbf71;
-  --warn: #f1c21b;
-
   position: fixed;
   inset: 0;
   display: grid;

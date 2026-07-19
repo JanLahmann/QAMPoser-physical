@@ -1,33 +1,15 @@
 /*
  * Entangible Pocket — iPad-first stylesheet.
  *
- * The design tokens are copied verbatim from the booth v2 system
- * (display-app/src/booth/booth-v2.css, docs/booth-ux.md) so Pocket reads as the
- * booth's sibling: layered near-black surfaces, hairline borders, purple
- * reserved for entanglement, cyan histogram bars, IBM Plex. Class names are
- * pocket-prefixed (`pk-`). Sizes are authored in rem/px for a handheld screen
- * (not the booth's 3 m vh scale), and the layout is landscape-primary with a
- * portrait fallback.
+ * The design tokens now live in the shared `@shared/tokens.css` (SC2, the
+ * single design-system source, imported first in main.tsx) — this file's
+ * former :root block was the superset and moved there verbatim. Pocket still
+ * reads as the booth's sibling: layered near-black surfaces, hairline borders,
+ * purple reserved for entanglement, cyan histogram bars, IBM Plex. Class names
+ * are pocket-prefixed (`pk-`). Sizes are authored in rem/px for a handheld
+ * screen (not the booth's 3 m vh scale), and the layout is landscape-primary
+ * with a portrait fallback.
  */
-
-:root {
-  --bg: #0f1117;
-  --bg-panel: #161a22;
-  --bg-inset: #11141b;
-  --border: #262b36;
-  --text: #e6e9ef;
-  --muted: #8a91a0;
-  --faint: #5c6370;
-  --accent: #0f62fe;
-  --bars: #33b1ff;
-  --entangle: #7a5cff;
-  --ok: #2fbf71;
-  --warn: #f1c21b;
-  --danger: #e5484d;
-  --radius: 8px;
-  --sans: 'IBM Plex Sans', -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif;
-  --mono: 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
-}
 
 * {
   box-sizing: border-box;

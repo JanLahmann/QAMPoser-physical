@@ -7,6 +7,9 @@ import '@fontsource/ibm-plex-sans/400.css';
 import '@fontsource/ibm-plex-sans/600.css';
 import '@fontsource/ibm-plex-mono/400.css';
 
+// Shared design tokens (SC2) — the single design-system source, loaded before
+// any app CSS so :root custom properties resolve for styles.css and booth-v2.css.
+import '@shared/tokens.css';
 import './styles.css';
 import { BoothView } from './booth/BoothView';
 import { DebugView } from './debug/DebugView';

@@ -17,7 +17,6 @@ import {
   createDefaultCircuit,
   type Circuit,
 } from '@qamposer/react';
-import { activeQubits } from '@quantum/statevector';
 import { evaluateMoment, initialMomentState, type MomentState } from '@quantum/moments';
 import { useCamera } from './useCamera';
 import { pinchZoom, pointerDistance, type Point as PinchPoint } from './zoom';
@@ -25,6 +24,7 @@ import { MessageStrip, type StripMessage } from './MessageStrip';
 import { Celebrations, LOW_POWER_PARTICLES, type CelebrationRequest } from './Celebrations';
 import { ResultsHistogram } from './ResultsHistogram';
 import { QasmPanel } from './QasmPanel';
+import { StatePanel } from '@shared/display/StatePanel';
 import { TransferButton } from './TransferButton';
 import { QSphereView } from '@quantum/QSphereView';
 import { BlochView } from '@quantum/BlochView';
@@ -69,27 +69,6 @@ const BOARD_QUBITS = BOARD.rows;
 const storage = typeof window !== 'undefined' ? window.localStorage : null;
 
 const DEBUG_THROTTLE_MS = 250;
-
-function StatePanel({ circuit }: { circuit: Circuit }) {
-  const touched = activeQubits(circuit).length;
-  const columns = new Set(circuit.gates.map((g) => g.position)).size;
-  return (
-    <div>
-      <div className="pk-label">State</div>
-      <div className="pk-stats">
-        <div className="pk-stat">
-          qubits touched <b>{touched}</b>
-        </div>
-        <div className="pk-stat">
-          gates <b>{circuit.gates.length}</b>
-        </div>
-        <div className="pk-stat">
-          columns <b>{columns}</b>
-        </div>
-      </div>
-    </div>
-  );
-}
 
 /** Element-Fullscreen state + toggle, feature-detected (hidden on iPhone). */
 function useFullscreen() {
@@ -479,7 +458,7 @@ export function App() {
         case 'results':
           return <ResultsHistogram key="results" circuit={circuit} displayQubits={displayed.qubits} />;
         case 'state':
-          return <StatePanel key="state" circuit={circuit} />;
+          return <StatePanel key="state" circuit={circuit} classPrefix="pk" />;
         case 'qasm':
           return <QasmPanel key="qasm" circuit={circuit} />;
         default:
@@ -504,7 +483,7 @@ export function App() {
       {hasPanel('results') && (
         <ResultsHistogram key="results" circuit={circuit} displayQubits={displayed.qubits} />
       )}
-      {hasPanel('state') && <StatePanel key="state" circuit={circuit} />}
+      {hasPanel('state') && <StatePanel key="state" circuit={circuit} classPrefix="pk" />}
       {hasPanel('qasm') && <QasmPanel key="qasm" circuit={circuit} />}
       <TransferButton key="transfer" circuit={circuit} onToast={pushStrip} />
       {settings.debug && <DebugPanel key="debug" frame={lastFrameRef.current} fps={camera.fps} />}

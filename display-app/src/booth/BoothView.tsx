@@ -24,7 +24,6 @@ import { useEntangibleState } from '../ws/useEntangibleState';
 import { friendlyWarning } from '@shared/display/warnings';
 import type { ConnectionState } from '../ws/stateSocket';
 import type { CircuitMessage } from '../ws/messages';
-import { activeQubits } from '@quantum/statevector';
 import {
   evaluateMoment,
   initialMomentState,
@@ -45,18 +44,12 @@ import { HINTS, HINT_ROTATE_MS } from '@shared/display/hints';
 import { QSphereView } from '@quantum/QSphereView';
 import { BlochView } from '@quantum/BlochView';
 import { golfStep, initialGolfState, LEVELS, type GolfState } from '@quantum/golf';
+import { QasmPanel as SharedQasmPanel } from '@shared/display/QasmPanel';
+import { StatePanel } from '@shared/display/StatePanel';
 import './booth-v2.css';
 
 const BOARD_QUBITS = 5;
 const DEFAULT_PANELS = ['results', 'state', 'qasm'];
-
-/** QASM gate-line tint (gate colors at 60 % on the dark inset). */
-const QASM_TINTS: ReadonlyArray<[RegExp, string]> = [
-  [/^h /, 'rgba(250, 77, 86, 0.75)'],
-  [/^(x|cx) /, 'rgba(94, 132, 235, 0.85)'],
-  [/^(y|rx|ry)/, 'rgba(214, 82, 150, 0.8)'],
-  [/^(z|rz|s |t )/, 'rgba(51, 177, 255, 0.75)'],
-];
 
 interface Branding {
   name?: string | null;
@@ -75,43 +68,17 @@ function connectionInfo(state: ConnectionState): { label: string; cls: string } 
   }
 }
 
+/**
+ * OPENQASM panel — booth binding of the shared QasmPanel. The QASM arrives
+ * pre-rendered from the host; show its last 7 non-empty lines, and hide the
+ * panel entirely when there is nothing to show.
+ */
 function QasmPanel({ qasm }: { qasm: string | undefined }) {
   const lines = useMemo(() => {
     const all = (qasm ?? '').split('\n').filter((l) => l.trim().length > 0);
     return all.slice(-7);
   }, [qasm]);
-  if (lines.length === 0) return null;
-  return (
-    <div>
-      <div className="bo-label">OpenQASM 2.0</div>
-      <div className="bo-well bo-qasm">
-        {lines.map((line, i) => {
-          const tint = QASM_TINTS.find(([re]) => re.test(line))?.[1];
-          const isKw = /^(OPENQASM|include|qreg|creg)/.test(line);
-          return (
-            <div key={i} className={isKw ? 'kw' : undefined} style={tint ? { color: tint } : undefined}>
-              {line}
-            </div>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
-
-function StatePanel({ circuit }: { circuit: Circuit }) {
-  const touched = activeQubits(circuit).length;
-  const columns = new Set(circuit.gates.map((g) => g.position)).size;
-  return (
-    <div>
-      <div className="bo-label">State</div>
-      <div className="bo-stats">
-        <div className="bo-stat">qubits touched <b>{touched}</b></div>
-        <div className="bo-stat">gates <b>{circuit.gates.length}</b></div>
-        <div className="bo-stat">columns <b>{columns}</b></div>
-      </div>
-    </div>
-  );
+  return <SharedQasmPanel lines={lines} classPrefix="bo" hideWhenEmpty />;
 }
 
 export function BoothView() {
@@ -269,7 +236,7 @@ export function BoothView() {
           </div>
         );
       case 'state':
-        return <StatePanel key="state" circuit={liveCircuit} />;
+        return <StatePanel key="state" circuit={liveCircuit} classPrefix="bo" />;
       case 'qasm':
         return <QasmPanel key="qasm" qasm={circuit?.qasm} />;
       default:

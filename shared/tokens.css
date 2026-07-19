@@ -1,0 +1,33 @@
+/*
+ * Entangible design tokens — the single source of truth for the design system
+ * (SC2). Both apps import this before their own stylesheet:
+ *   - display-app (booth): `@shared/tokens.css` in main.tsx, then styles.css /
+ *     booth-v2.css. The booth's `.bo` shell used to redeclare these on itself;
+ *     it now inherits them from :root (resolved values unchanged — the booth
+ *     merely gains the extras it never referenced: --danger/--radius/--sans/
+ *     --mono).
+ *   - pocket-app: `@shared/tokens.css` in main.tsx, then pocket.css. Pocket's
+ *     own :root block moved here verbatim; it is the superset.
+ *
+ * Values are the layered near-black exhibit palette (docs/booth-ux.md): purple
+ * reserved for entanglement, cyan histogram bars, IBM Plex. Changing a value
+ * here changes it for every role/app at once.
+ */
+:root {
+  --bg: #0f1117;
+  --bg-panel: #161a22;
+  --bg-inset: #11141b;
+  --border: #262b36;
+  --text: #e6e9ef;
+  --muted: #8a91a0;
+  --faint: #5c6370;
+  --accent: #0f62fe;
+  --bars: #33b1ff;
+  --entangle: #7a5cff;
+  --ok: #2fbf71;
+  --warn: #f1c21b;
+  --danger: #e5484d;
+  --radius: 8px;
+  --sans: 'IBM Plex Sans', -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif;
+  --mono: 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+}
