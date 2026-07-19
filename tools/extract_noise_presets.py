@@ -22,6 +22,8 @@ Derivation (see docs/design.md "In-browser noise model"):
 
 Presets:
   - `today` (FakeAachen, 156q Heron): device-wide medians, uniform scalars.
+  - `nighthawk` (FakeBerlin, 120q Nighthawk): device-wide medians, uniform
+    scalars — IBM's newest chip generation as a third point on the arc.
   - `early` (FakeManilaV2, 5q Falcon-era): per-qubit ARRAYS (length 5, qubit i
     -> wire i) for gamma1/gammaPhi/readout; median scalars for p1/p2.
 
@@ -35,7 +37,7 @@ import math
 from pathlib import Path
 from statistics import median
 
-from qiskit_ibm_runtime.fake_provider import FakeAachen, FakeManilaV2
+from qiskit_ibm_runtime.fake_provider import FakeAachen, FakeBerlin, FakeManilaV2
 
 OUT = Path(__file__).resolve().parent.parent / "shared" / "quantum" / "noisePresets.json"
 REGEN_CMD = "uv run --no-project tools/extract_noise_presets.py"
@@ -180,6 +182,7 @@ def main() -> None:
         "regenerate": REGEN_CMD,
         "wires": 5,
         "today": build_today(FakeAachen()),
+        "nighthawk": build_today(FakeBerlin()),
         "early": build_early(FakeManilaV2()),
     }
     OUT.write_text(json.dumps(presets, indent=2, sort_keys=True) + "\n")

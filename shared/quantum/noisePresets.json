@@ -47,6 +47,23 @@
       0.0186
     ]
   },
+  "nighthawk": {
+    "gamma1": 0.000209973,
+    "gammaPhi": 0.000168693,
+    "p1": 0.000211103,
+    "p2": 0.00219356,
+    "provenance": {
+      "T1_median_us": 323.817,
+      "T2_median_us": 248.443,
+      "backend": "fake_berlin",
+      "momentNs": 68.0,
+      "num_qubits": 120,
+      "regenerate": "uv run --no-project tools/extract_noise_presets.py",
+      "statistic": "device-wide medians (uniform scalars)",
+      "two_qubit_gate": "cz"
+    },
+    "readout": 0.020752
+  },
   "regenerate": "uv run --no-project tools/extract_noise_presets.py",
   "today": {
     "gamma1": 0.000292623,

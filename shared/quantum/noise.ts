@@ -55,7 +55,7 @@ export interface NoiseParams {
   readonly readout: number | readonly number[];
 }
 
-export type NoisePreset = 'off' | 'today' | 'early';
+export type NoisePreset = 'off' | 'today' | 'nighthawk' | 'early';
 
 const OFF: NoiseParams = { p1: 0, p2: 0, gamma1: 0, gammaPhi: 0, readout: 0 };
 

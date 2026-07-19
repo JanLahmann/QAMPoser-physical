@@ -299,6 +299,10 @@ extract them from `qiskit_ibm_runtime.fake_provider` calibration snapshots
 - `Today's hardware` — **FakeAachen** (156-qubit Heron snapshot): median
   1q/2q gate error → p1/p2; median T1/T2 + a moment duration set to the
   median 2q-gate duration → per-moment γ₁/γ_φ; median readout confusion.
+- `Nighthawk` — **FakeBerlin** (120-qubit Nighthawk snapshot, added per Jan
+  2026-07-19): same median extraction. IBM's newest chip generation as a
+  third point on the arc — better T1 than Heron but early-calibration CZ
+  and readout, an honest "new architectures start behind mature ones" datum.
 - `Early device` — a Falcon-era **5-qubit** fake (FakeManilaV2 or
   FakeLimaV2): its 5 qubits map 1:1 onto our 5 wires, so this preset gets
   *per-qubit* T1/T2/readout for free and is a genuinely real 2021-era
