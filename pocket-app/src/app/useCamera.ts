@@ -11,6 +11,7 @@
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { PocketPipeline, type FrameResult } from '../vision/pipeline';
+import { buildVideoConstraints, shouldFallbackToAuto } from './cameraDevices';
 import { applyVideoFreeze, shouldProcess, videoFreezeAction } from './freeze';
 import {
   applyNativeZoom,
@@ -57,16 +58,39 @@ interface Options {
    * picture visibly holds. Session-momentary; the stream itself stays live.
    */
   paused?: boolean;
+  /**
+   * Chosen camera `deviceId`, or `null` for automatic rear-facing selection.
+   * Changing it while the camera runs restarts the stream on the new device.
+   */
+  cameraId?: string | null;
+  /**
+   * Called when a chosen `cameraId` was unavailable and the stream fell back to
+   * the automatic camera. The app clears the stored id and shows a gentle toast.
+   */
+  onCameraFallback?: () => void;
 }
 
 const TARGET_PROCESS_MS = 45; // aim ~20 detections/s; skip frames to hold it
 const ZOOM_STORAGE_KEY = 'entangible.pocket.zoom';
 
-export function useCamera({ onResult, lowPower = false, paused = false }: Options): CameraState {
+export function useCamera({
+  onResult,
+  lowPower = false,
+  paused = false,
+  cameraId = null,
+  onCameraFallback,
+}: Options): CameraState {
   const lowPowerRef = useRef(lowPower);
   lowPowerRef.current = lowPower;
   const pausedRef = useRef(paused);
   pausedRef.current = paused;
+  const cameraIdRef = useRef(cameraId);
+  cameraIdRef.current = cameraId;
+  const onCameraFallbackRef = useRef(onCameraFallback);
+  onCameraFallbackRef.current = onCameraFallback;
+  // Last id the running stream was actually started with — the restart effect
+  // compares against it to decide whether a change needs a stop→start.
+  const startedWithIdRef = useRef(cameraId);
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -201,16 +225,29 @@ export function useCamera({ onResult, lowPower = false, paused = false }: Option
     }
     setStatus('starting');
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: {
-          facingMode: { ideal: 'environment' },
-          // Request 1080p: native zoom crops the sensor, digital zoom crops the
-          // frame — both want the extra pixels for pixels-per-marker.
-          width: { ideal: 1920 },
-          height: { ideal: 1080 },
-        },
-        audio: false,
-      });
+      // A chosen camera targets one device (deviceId: exact); null asks for the
+      // rear-facing camera. If a stored device is gone the exact request rejects
+      // — retry once on the automatic constraint, tell the app to clear the id,
+      // and surface a gentle toast (onCameraFallback → App).
+      const wantId = cameraIdRef.current;
+      startedWithIdRef.current = wantId;
+      let stream: MediaStream;
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({
+          video: buildVideoConstraints({ cameraId: wantId }),
+          audio: false,
+        });
+      } catch (err) {
+        if (!shouldFallbackToAuto(wantId, err)) throw err;
+        stream = await navigator.mediaDevices.getUserMedia({
+          video: buildVideoConstraints({ cameraId: null }),
+          audio: false,
+        });
+        // We are now on the automatic camera. Record that so the id-reset the
+        // fallback triggers (cameraId → null) doesn't bounce the stream again.
+        startedWithIdRef.current = null;
+        onCameraFallbackRef.current?.();
+      }
       streamRef.current = stream;
       const video = videoRef.current;
       if (!video) return;
@@ -276,6 +313,24 @@ export function useCamera({ onResult, lowPower = false, paused = false }: Option
     document.addEventListener('visibilitychange', onVisibility);
     return () => document.removeEventListener('visibilitychange', onVisibility);
   }, [status, loop, requestWakeLock]);
+
+  // Live camera switch: when the chosen device differs from the one the running
+  // stream was started with, restart on the new one — stop→start with the new
+  // constraint (start reads the latest id via cameraIdRef). While idle it's a
+  // no-op; the next manual Start picks up the new id. Comparing against the
+  // id the stream actually started with (not the previous prop) means the
+  // fallback's own cameraId→null reset does not bounce the stream.
+  const statusRef = useRef(status);
+  statusRef.current = status;
+  useEffect(() => {
+    if (startedWithIdRef.current === cameraId) return;
+    if (statusRef.current === 'running' || statusRef.current === 'starting') {
+      stop();
+      void start();
+    } else {
+      startedWithIdRef.current = cameraId;
+    }
+  }, [cameraId, stop, start]);
 
   useEffect(() => () => stop(), [stop]);
 

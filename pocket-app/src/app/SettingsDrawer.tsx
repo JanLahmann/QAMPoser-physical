@@ -15,6 +15,12 @@ import {
   type Side,
   type Wires,
 } from './settings';
+import {
+  enumerateCameras,
+  hasOnlyPlaceholders,
+  subscribeDeviceChange,
+  type CameraDevice,
+} from './cameraDevices';
 
 const PANEL_LABELS: Record<PanelId, string> = {
   camera: 'Camera preview',
@@ -71,6 +77,67 @@ function Toggle({
         <span className="pk-toggle-thumb" />
       </span>
     </button>
+  );
+}
+
+/**
+ * Live list of the machine's cameras. Enumerates on mount (the drawer remounts
+ * this each time it opens, so reopening after the first camera start picks up
+ * the now-populated real labels) and follows `devicechange` — an iPhone joining
+ * a Mac as a Continuity Camera, a USB webcam plugged in, etc.
+ */
+function useCameraDevices(): CameraDevice[] {
+  const [devices, setDevices] = useState<CameraDevice[]>([]);
+  useEffect(() => {
+    let alive = true;
+    const refresh = () => {
+      void enumerateCameras().then((list) => {
+        if (alive) setDevices(list);
+      });
+    };
+    refresh();
+    const unsub = subscribeDeviceChange(refresh);
+    return () => {
+      alive = false;
+      unsub();
+    };
+  }, []);
+  return devices;
+}
+
+/** CAMERA section — pick the capture device (Automatic, or a specific camera). */
+function CameraSection() {
+  const settings = useSettings();
+  const devices = useCameraDevices();
+  const options: Array<{ value: string | null; label: string }> = [
+    { value: null, label: 'Automatic (rear)' },
+    ...devices.map((d) => ({ value: d.deviceId, label: d.label })),
+  ];
+  return (
+    <section className="pk-drawer-sec">
+      <div className="pk-label">Camera</div>
+      <div className="pk-radio" role="radiogroup" aria-label="Camera">
+        {options.map((o) => {
+          const selected = settings.cameraId === o.value;
+          return (
+            <button
+              key={o.value ?? '__auto__'}
+              type="button"
+              className={`pk-radio-btn ${selected ? 'is-on' : ''}`}
+              role="radio"
+              aria-checked={selected}
+              onClick={() => settingsStore.update({ cameraId: o.value })}
+            >
+              <span className="pk-radio-dot" aria-hidden="true" />
+              <span className="pk-radio-label">{o.label}</span>
+            </button>
+          );
+        })}
+      </div>
+      {hasOnlyPlaceholders(devices) && (
+        <p className="pk-drawer-hint">Start the camera once to see camera names.</p>
+      )}
+    </section>
   );
 }
 
@@ -169,6 +236,8 @@ export function SettingsControl() {
                   onChange={(side) => settingsStore.update({ side })}
                 />
               </section>
+
+              <CameraSection />
 
               <section className="pk-drawer-sec">
                 <div className="pk-label">Power</div>

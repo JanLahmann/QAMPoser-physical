@@ -1,3 +1,4 @@
+import LZString from 'lz-string';
 import { describe, it, expect, vi } from 'vitest';
 import type { Circuit } from '@qamposer/react';
 import {
@@ -28,10 +29,34 @@ describe('canTransfer', () => {
 
 describe('composerUrl', () => {
   // The current cloud Composer takes no circuit URL param (verified against its
-  // full client bundle, 2026-07-19) — it is simply the plain editor URL.
-  it('is the plain Composer editor URL with no circuit param', () => {
+  // ?initial= carries LZ-compressed {title, description, qasm} — the format
+  // rediscovered from Qoffee-Maker and visually verified on the live cloud
+  // Composer (2026-07-19).
+  it('is the plain editor URL without qasm', () => {
     expect(composerUrl()).toBe(COMPOSER_BASE);
     expect(composerUrl()).not.toContain('?');
+  });
+
+  it('pre-loads the circuit via ?initial= when qasm is given', () => {
+    const url = composerUrl('OPENQASM 2.0;\nqreg q[2];\nh q[0];\n');
+    expect(url.startsWith(`${COMPOSER_BASE}?initial=`)).toBe(true);
+    // Round-trip: decode the param back to the payload.
+    const component = decodeURIComponent(url.split('?initial=')[1]);
+    const json = LZString.decompressFromEncodedURIComponent(component);
+    const payload = JSON.parse(json!);
+    expect(payload.qasm).toContain('h q[0];');
+    expect(payload.title).toBe('Built with Entangible');
+    expect(payload.description).toBe('');
+  });
+
+  it('falls back to the plain URL when the payload would be enormous', () => {
+    // Genuinely incompressible payload via an LCG (cyclic strings LZ-compress too well).
+    let x = 42;
+    const noisy = Array.from({ length: 30000 }, () => {
+      x = (x * 1103515245 + 12345) % 2147483648;
+      return String.fromCharCode(33 + (x % 90));
+    }).join('');
+    expect(composerUrl(noisy)).toBe(COMPOSER_BASE);
   });
 });
 
@@ -48,7 +73,7 @@ describe('transferToComposer', () => {
     const result = await transferToComposer(BELL_QASM, env);
     expect(env.clipboard!.writeText).toHaveBeenCalledWith(BELL_QASM);
     expect(env.execCopy).not.toHaveBeenCalled();
-    expect(env.open).toHaveBeenCalledWith(composerUrl(), '_blank', 'noopener');
+    expect(env.open).toHaveBeenCalledWith(composerUrl(BELL_QASM), '_blank', 'noopener');
     expect(result).toMatchObject({ copied: true, opened: true, message: COPIED_MESSAGE });
   });
 
@@ -70,7 +95,7 @@ describe('transferToComposer', () => {
       execCopy: vi.fn().mockReturnValue(false),
     });
     const result = await transferToComposer(BELL_QASM, env);
-    expect(env.open).toHaveBeenCalledWith(composerUrl(), '_blank', 'noopener');
+    expect(env.open).toHaveBeenCalledWith(composerUrl(BELL_QASM), '_blank', 'noopener');
     expect(result).toMatchObject({ copied: false, opened: true, message: NO_COPY_MESSAGE });
   });
 

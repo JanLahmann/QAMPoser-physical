@@ -54,6 +54,7 @@ describe('sanitize', () => {
       lowpower: false,
       debug: true,
       wires: 'compact',
+      cameraId: null,
     });
   });
 
@@ -61,6 +62,44 @@ describe('sanitize', () => {
     expect(sanitize({}).wires).toBe('compact');
     expect(sanitize({ wires: 'bogus' }).wires).toBe('compact');
     expect(sanitize({ wires: 'all' }).wires).toBe('all');
+  });
+
+  it('defaults cameraId to null and accepts a non-empty string id', () => {
+    expect(sanitize({}).cameraId).toBeNull();
+    expect(sanitize({ cameraId: null }).cameraId).toBeNull();
+    expect(sanitize({ cameraId: '' }).cameraId).toBeNull(); // empty → automatic
+    expect(sanitize({ cameraId: 42 }).cameraId).toBeNull(); // wrong type → automatic
+    expect(sanitize({ cameraId: 'cam-b' }).cameraId).toBe('cam-b');
+  });
+});
+
+describe('cameraId setting', () => {
+  it('is null by default with no storage and no url', () => {
+    expect(createSettingsStore().get().cameraId).toBeNull();
+  });
+
+  it('has no URL override — ?cameraId is ignored', () => {
+    const store = createSettingsStore({ search: '?cameraId=cam-b' });
+    expect(store.get().cameraId).toBeNull();
+  });
+
+  it('persists a chosen camera and reloads it', () => {
+    const storage = fakeStorage();
+    const store = createSettingsStore({ storage });
+    store.update({ cameraId: 'cam-b' });
+    expect(store.get().cameraId).toBe('cam-b');
+    expect(JSON.parse(storage._map.get(STORAGE_KEY)!).cameraId).toBe('cam-b');
+    // A fresh store reading the same storage keeps the persisted choice.
+    expect(createSettingsStore({ storage }).get().cameraId).toBe('cam-b');
+  });
+
+  it('resets back to automatic (null) on update', () => {
+    const storage = fakeStorage({ [STORAGE_KEY]: JSON.stringify({ cameraId: 'cam-b' }) });
+    const store = createSettingsStore({ storage });
+    expect(store.get().cameraId).toBe('cam-b');
+    store.update({ cameraId: null });
+    expect(store.get().cameraId).toBeNull();
+    expect(JSON.parse(storage._map.get(STORAGE_KEY)!).cameraId).toBeNull();
   });
 });
 

@@ -70,7 +70,7 @@ describe('TransferButton', () => {
     expect(copiedQasm).toContain('h q[0];');
     expect(copiedQasm).toContain('cx q[0], q[1];');
     expect(open).toHaveBeenCalledWith(
-      'https://quantum.cloud.ibm.com/composer',
+      expect.stringContaining('https://quantum.cloud.ibm.com/composer?initial='),
       '_blank',
       'noopener',
     );

@@ -114,7 +114,8 @@ export function GuidePage() {
           </ol>
           <p className="pk-guide-muted pk-guide-tips">
             Tips: pinch to zoom; the gear opens settings, including golf mode and a debug view;
-            matte print beats glossy; screens work as boards (below).
+            matte print beats glossy; screens work as boards (below). On a Mac, your iPhone can be
+            the camera via Continuity — pick it under Settings → Camera.
           </p>
         </section>
 
@@ -124,7 +125,13 @@ export function GuidePage() {
           <p>
             Built something you like? The <b>Transfer to IBM Composer</b> button copies your
             circuit's QASM and opens IBM Quantum Composer in a new tab. In the Composer, choose
-            <b> View → Code Editor</b> and paste to load your circuit. A free IBM Quantum account
+            your circuit opens pre-loaded (the QASM is also copied — paste via
+            <b> View → Code Editor</b> if ever needed). To run it on a real quantum
+            computer, sign in — or register for free at{' '}
+            <a href="https://quantum.cloud.ibm.com/registration" target="_blank" rel="noopener noreferrer">
+              quantum.cloud.ibm.com/registration
+            </a>
+            . A free IBM Quantum account
             (the Open Plan) then lets you run it on a real quantum computer.
           </p>
         </section>

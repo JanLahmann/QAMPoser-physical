@@ -2,38 +2,44 @@
  * "Transfer to IBM Composer" — take-it-home handoff (docs/design.md,
  * "Take it home — run on real hardware", simplified 2026-07-19 to ONE button).
  *
- * The button copies the circuit's OpenQASM to the clipboard AND opens IBM
- * Quantum Composer in a new tab; the visitor pastes the QASM into the
- * Composer's code editor (View → Code Editor).
+ * ONE TAP: opens IBM Quantum Composer with the circuit PRE-LOADED via the
+ * `?initial=` URL parameter, AND copies the QASM to the clipboard as a
+ * belt-and-braces fallback.
  *
- * NOTE (verified 2026-07-19 by the design lead against the Composer's full
- * 8.5 MB client bundle incl. lazy chunks): the current cloud Composer has NO
- * URL circuit initialization — no `?initial=`, no hash variant. The old IQX
- * `?initial=<qasm>` convention is dead, so we open the plain Composer and rely
- * on the clipboard copy. `composerUrl()` stays the single source of the URL.
+ * URL format (VERIFIED WORKING 2026-07-19, visually confirmed by Jan on the
+ * live cloud Composer; rediscovered from the Qoffee-Maker family project,
+ * qoffeefrontend/app.js): `?initial=` carries
+ * encodeURIComponent(LZString.compressToEncodedURIComponent(JSON.stringify(
+ * {title, description, qasm}))). Earlier bundle forensics wrongly concluded
+ * the param was dead — a reminder that a negative grep proves nothing.
  * No credentials, no server round-trip — everything the visitor needs leaves
  * on their own device (design decision: NO in-app API-key entry).
  */
+import LZString from 'lz-string';
 import type { Circuit } from '@qamposer/react';
 
 /** IBM Quantum Composer (cloud). */
 export const COMPOSER_BASE = 'https://quantum.cloud.ibm.com/composer';
 
-/** Toast shown when the QASM made it onto the clipboard (the primary path). */
+/** Toast shown when the Composer opened with the circuit + clipboard copy. */
 export const COPIED_MESSAGE =
-  'QASM copied — in the Composer choose View → Code Editor and paste.';
+  'Composer opened with your circuit — sign in (free) to run it on a real quantum computer.';
 
-/** Toast shown when copying failed: the tab still opened. */
+/** Toast shown when copying failed: the pre-loaded tab still opened. */
 export const NO_COPY_MESSAGE =
-  "Couldn't copy — use the QASM panel to copy manually, then paste in the Composer's code editor.";
+  'Composer opened with your circuit — sign in (free) to run it on real hardware.';
 
 /**
- * The Composer URL. The current cloud Composer takes no circuit URL param (see
- * the file header), so this is simply the plain editor URL — kept as a function
- * so there is a single source of the destination.
+ * The Composer URL with the circuit pre-loaded via `?initial=` (see the file
+ * header for the verified format). Falls back to the plain editor URL if the
+ * encoded payload would exceed a conservative URL-length budget.
  */
-export function composerUrl(): string {
-  return COMPOSER_BASE;
+export function composerUrl(qasm?: string, title = 'Built with Entangible'): string {
+  if (!qasm) return COMPOSER_BASE;
+  const payload = JSON.stringify({ title, description: '', qasm });
+  const component = encodeURIComponent(LZString.compressToEncodedURIComponent(payload));
+  const url = `${COMPOSER_BASE}?initial=${component}`;
+  return url.length > 7500 ? COMPOSER_BASE : url;
 }
 
 /** A circuit is transferable once it has at least one gate. */
@@ -115,7 +121,7 @@ export async function transferToComposer(
   env: TransferEnv = defaultEnv(),
 ): Promise<TransferResult> {
   const copied = await tryCopy(qasm, env);
-  const url = composerUrl();
+  const url = composerUrl(qasm);
   let opened = false;
   try {
     env.open(url, '_blank', 'noopener');

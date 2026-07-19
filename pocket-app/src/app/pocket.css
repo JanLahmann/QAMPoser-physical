@@ -947,6 +947,71 @@ body,
   background: var(--entangle);
 }
 
+/* radio list (camera picker) */
+.pk-radio {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.pk-radio-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  width: 100%;
+  min-height: 44px;
+  padding: 0.4rem 0.7rem;
+  text-align: left;
+  font-family: var(--sans);
+  font-size: 0.92rem;
+  color: var(--text);
+  background: var(--bg-inset);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.pk-radio-btn.is-on {
+  border-color: var(--entangle);
+  background: rgba(122, 92, 255, 0.14);
+}
+
+.pk-radio-dot {
+  flex: none;
+  width: 1.05rem;
+  height: 1.05rem;
+  border-radius: 50%;
+  border: 2px solid var(--muted);
+  position: relative;
+}
+
+.pk-radio-btn.is-on .pk-radio-dot {
+  border-color: var(--entangle);
+}
+
+.pk-radio-btn.is-on .pk-radio-dot::after {
+  content: '';
+  position: absolute;
+  inset: 3px;
+  border-radius: 50%;
+  background: var(--entangle);
+}
+
+.pk-radio-label {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pk-drawer-hint {
+  margin: 0.55rem 0 0;
+  color: var(--muted);
+  font-size: 0.82rem;
+  line-height: 1.35;
+}
+
 /* ---- Q-sphere (2D) ---------------------------------------------------- */
 
 .pk-qsphere {

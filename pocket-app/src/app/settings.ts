@@ -33,6 +33,15 @@ export interface Settings {
   readonly lowpower: boolean;
   readonly debug: boolean;
   readonly wires: Wires;
+  /**
+   * Chosen camera, by `MediaDeviceInfo.deviceId`. `null` = automatic — let the
+   * browser pick via `facingMode:'environment'` (the rear camera on phones, the
+   * built-in webcam on laptops). A specific id targets one device (e.g. an
+   * iPhone appearing as a Continuity Camera on a Mac). Persisted; NOT
+   * URL-overridable. A stored id that no longer resolves falls back to automatic
+   * at `getUserMedia` time (see useCamera) and is reset to `null` there.
+   */
+  readonly cameraId: string | null;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -44,6 +53,7 @@ export const DEFAULT_SETTINGS: Settings = {
   lowpower: false,
   debug: false,
   wires: 'compact',
+  cameraId: null,
 };
 
 /**
@@ -133,6 +143,11 @@ export function sanitize(raw: unknown): Settings {
     ? (r.panels.filter((p): p is PanelId => (PANEL_IDS as readonly string[]).includes(p as string)) as PanelId[])
     : [...DEFAULT_SETTINGS.panels];
   const wires: Wires = r.wires === 'all' ? 'all' : 'compact';
+  // A non-empty string is a candidate deviceId; anything else (missing, empty,
+  // wrong type) means automatic. A stale-but-valid-looking id is accepted here
+  // and only proven dead when getUserMedia rejects — then useCamera resets it.
+  const cameraId: string | null =
+    typeof r.cameraId === 'string' && r.cameraId.length > 0 ? r.cameraId : null;
   return {
     mode,
     panels,
@@ -140,6 +155,7 @@ export function sanitize(raw: unknown): Settings {
     lowpower: r.lowpower === true,
     debug: r.debug === true,
     wires,
+    cameraId,
   };
 }
 

@@ -35,7 +35,7 @@ import { TouchInspector } from './TouchInspector';
 import { toggleFrozen } from './freeze';
 import { GuidePage } from './GuidePage';
 import { useRoute } from './hashNav';
-import { useSettings, type PanelId } from './settings';
+import { settingsStore, useSettings, type PanelId } from './settings';
 import { displayCircuit } from './displayWires';
 import { editorFit, editorNaturalHeight, type EditorFit } from './editorFit';
 import {
@@ -369,7 +369,20 @@ export function App() {
     [pushStrip],
   );
 
-  const camera = useCamera({ onResult, lowPower: settings.lowpower, paused: frozen });
+  // A chosen camera that no longer resolves: useCamera has already fallen back
+  // to the default device — clear the stale id and give a gentle heads-up.
+  const onCameraFallback = useCallback(() => {
+    settingsStore.update({ cameraId: null });
+    pushStrip('Selected camera unavailable — using default');
+  }, [pushStrip]);
+
+  const camera = useCamera({
+    onResult,
+    lowPower: settings.lowpower,
+    paused: frozen,
+    cameraId: settings.cameraId,
+    onCameraFallback,
+  });
   fpsRef.current = camera.fps;
 
   const toggleFreeze = useCallback(() => setFrozen((f) => toggleFrozen(f)), []);
