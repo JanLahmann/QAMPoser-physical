@@ -338,3 +338,12 @@ quantum-mixer findings above; QN4 closes it out.
    touch booth devices — consistent with the standing "NO in-app
    API-key/CRN entry" decision in design.md. QN2 makes sure the served/order
    card embeds that QR.
+
+   *Real-hardware serve loop (per Jan 2026-07-19):* the visitor scans our
+   Composer QR to transfer the circuit to their device, runs it there with
+   **one shot**, and tells us the measured bitstring; staff enter it
+   manually on the `/debug` serve card (operator-gated) →
+   `served {…, shotSource: 'real'}` broadcasts like any other serve. The
+   one-shot instruction is text on the order card and in the Guide (the
+   Composer `?initial=` payload cannot preset a shot count). Needs only a
+   bitstring-entry field on QN2's `/debug` serve card — no extra phase.
