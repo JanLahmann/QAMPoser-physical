@@ -519,6 +519,12 @@ body {
   max-width: 90%;
   animation: ent-attract-breathe 6s ease-in-out infinite;
 }
+.ent-attract__site {
+  font-size: 1.9vh; /* ~20px @1080p */
+  text-align: center;
+  opacity: 0.55;
+  letter-spacing: 0.04em;
+}
 @keyframes ent-attract-breathe {
   0%,
   100% {

@@ -65,6 +65,11 @@ export function AttractMode({ branding }: { branding?: AttractBranding | null })
         <div className="ent-attract__cta">
           Build a quantum circuit with your hands — place a tile on the table
         </div>
+
+        {/* site + family credit — the booth's public face at events */}
+        <div className="ent-attract__site">
+          entangible.org · a Fun with Quantum project
+        </div>
       </div>
     </div>
   );

@@ -1516,6 +1516,14 @@ body,
   border-top: 1px solid var(--border);
 }
 
+.pk-guide-foot p {
+  margin: 0;
+}
+
+.pk-guide-foot p + p {
+  margin-top: 0.5rem;
+}
+
 /* ---- fullscreen test-board viewer ------------------------------------- */
 
 .pk-viewer {

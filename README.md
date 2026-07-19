@@ -39,3 +39,20 @@ uv run pytest packages/qamposer-vision   # run the vision test suite
 warning cases): open one fullscreen on a monitor and point a camera at it —
 the [pocket app](https://entangible.org), the booth `/capture` page, or
 `uv run qamposer-vision detect --image …`. See the folder README.
+
+## Part of the Fun with Quantum family
+
+Entangible is part of [**Fun with Quantum**](https://fun-with-quantum.org), a
+family of open-source quantum outreach projects:
+[RasQberry Two](https://rasqberry.org) ·
+[RasQberry One](https://rasqberry.one) ·
+[Quantego](https://quantego.org) ·
+[Qutie](https://qutie.org) ·
+[Qoffee-Maker](https://qoffee-maker.org).
+
+## Trademarks
+
+Entangible is an independent community project inspired by the
+[IBM Quantum Composer](https://quantum.cloud.ibm.com/composer). It is not
+affiliated with, endorsed by, or sponsored by IBM. IBM, IBM Quantum and Qiskit
+are trademarks of International Business Machines Corporation.

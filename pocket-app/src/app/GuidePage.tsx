@@ -20,6 +20,15 @@ const ISSUES_URL = 'https://github.com/JanLahmann/entangible/issues';
 const QAMPOSER_URL = 'https://qamposer.org';
 const RASQBERRY_URL = 'https://rasqberry.org';
 
+/** Fun-with-Quantum sibling projects — same list and order as the family READMEs. */
+const FAMILY = [
+  { name: 'RasQberry Two', url: 'https://rasqberry.org' },
+  { name: 'RasQberry One', url: 'https://rasqberry.one' },
+  { name: 'Quantego', url: 'https://quantego.org' },
+  { name: 'Qutie', url: 'https://qutie.org' },
+  { name: 'Qoffee-Maker', url: 'https://qoffee-maker.org' },
+] as const;
+
 function Label({ children }: { children: React.ReactNode }) {
   return <div className="pk-label pk-guide-label">{children}</div>;
 }
@@ -123,16 +132,15 @@ export function GuidePage() {
         <section className="pk-guide-sec">
           <Label>Run it for real</Label>
           <p>
-            Built something you like? The <b>Transfer to IBM Composer</b> button copies your
-            circuit's QASM and opens IBM Quantum Composer in a new tab. In the Composer, choose
-            your circuit opens pre-loaded (the QASM is also copied — paste via
-            <b> View → Code Editor</b> if ever needed). To run it on a real quantum
-            computer, sign in — or register for free at{' '}
+            Built something you like? The <b>Transfer to IBM Composer</b> button opens the
+            IBM Quantum Composer in a new tab with your circuit pre-loaded (the QASM is also
+            copied to your clipboard — paste via <b>View → Code Editor</b> if ever needed).
+            To run it on a real quantum computer, sign in — or register for free at{' '}
             <a href="https://quantum.cloud.ibm.com/registration" target="_blank" rel="noopener noreferrer">
               quantum.cloud.ibm.com/registration
             </a>
             . A free IBM Quantum account
-            (the Open Plan) then lets you run it on a real quantum computer.
+            (the Open Plan) then lets you run it on real hardware.
           </p>
         </section>
 
@@ -240,8 +248,35 @@ export function GuidePage() {
           </ul>
         </section>
 
+        {/* 6. Family */}
+        <section className="pk-guide-sec">
+          <Label>Part of the Fun with Quantum family</Label>
+          <p>
+            Entangible belongs to{' '}
+            <a href="https://fun-with-quantum.org" target="_blank" rel="noopener noreferrer">
+              <b>Fun with Quantum</b>
+            </a>
+            , a family of open-source quantum outreach projects:{' '}
+            {FAMILY.map((f, i) => (
+              <span key={f.name}>
+                {i > 0 && ' · '}
+                <a href={f.url} target="_blank" rel="noopener noreferrer">
+                  {f.name}
+                </a>
+              </span>
+            ))}
+            .
+          </p>
+        </section>
+
         <footer className="pk-guide-foot">
-          Open source, Apache-2.0 licensed. Made for the QAMPoser family.
+          <p>Open source, Apache-2.0 licensed. Part of the Fun with Quantum family.</p>
+          <p>
+            Entangible is an independent community project inspired by the IBM Quantum
+            Composer. It is not affiliated with, endorsed by, or sponsored by IBM. IBM,
+            IBM Quantum and Qiskit are trademarks of International Business Machines
+            Corporation.
+          </p>
         </footer>
       </div>
 
