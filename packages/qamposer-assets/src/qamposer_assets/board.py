@@ -223,7 +223,7 @@ def _footer_group(cfg: AssetsConfig) -> str:
         text(
             cx,
             y + 6.0,
-            "qamposer.org   ·   rasqberry.org",
+            "entangible.org   ·   qamposer.org   ·   rasqberry.org",
             size=4.0,
             color=n.faint,
             family=fam,
