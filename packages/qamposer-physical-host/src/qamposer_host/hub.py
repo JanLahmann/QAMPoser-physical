@@ -138,7 +138,7 @@ class Hub:
 
         Also broadcasts the new client count to everyone else (a status change).
         """
-        self._clients[client] = {"role": role, "label": label}
+        self._clients[client] = {"role": role, "label": label, "operator": False}
         if self._latest_circuit is not None:
             await self._send(client, self._latest_circuit)
         if self._latest_detection is not None:
@@ -153,10 +153,29 @@ class Hub:
         if self._clients.pop(client, None) is not None:
             await self._broadcast(self._status_message())
 
-    def set_role(self, client: WSClient, role: str, label: str | None = None) -> None:
-        """Update a client's role label from a ``hello`` message."""
+    def set_role(
+        self,
+        client: WSClient,
+        role: str,
+        label: str | None = None,
+        *,
+        operator: bool = False,
+    ) -> None:
+        """Update a client's role label + operator standing from a ``hello``.
+
+        ``operator`` is the *authenticated* flag (the caller has already verified
+        the token); it gates the ``select_*`` control messages. The ``role`` /
+        ``label`` are courtesy metadata only.
+        """
         if client in self._clients:
-            self._clients[client] = {"role": role, "label": label}
+            self._clients[client] = {
+                "role": role, "label": label, "operator": bool(operator),
+            }
+
+    def is_operator(self, client: WSClient) -> bool:
+        """True if this client authenticated as an operator on its ``hello``."""
+        entry = self._clients.get(client)
+        return bool(entry and entry.get("operator"))
 
     # -- publishing (async, on the event loop) -----------------------------
 

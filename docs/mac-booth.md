@@ -60,6 +60,21 @@ uv run qamposer-physical qr                    # https URL + ASCII QR
 uv run qamposer-physical qr --no-tls           # http URL variant
 ```
 
+The capture QR now carries the booth's **operator token** as `?key=…`, so the
+scanned `/capture` link is authenticated for the (token-gated) `/ws/frames`
+intake with no typing. Manage the token with:
+
+```bash
+uv run qamposer-physical token                 # print the shared operator token
+uv run qamposer-physical token --rotate        # mint a new one (reprint sheets)
+```
+
+The token is generated on first run and stored with the certs. It also gates
+`/debug` (its preview stream + `/api/qr`) and the `select_*` staff controls;
+open `/debug?key=<token>` (or enter it once at the `/debug` prompt — it is kept
+in the browser's `localStorage`). Viewer surfaces (`/`, `/pocket`, `/api/info`)
+stay open.
+
 ## macOS Application Firewall — allow LAN access
 
 If the macOS firewall is on (System Settings → Network → Firewall), incoming LAN

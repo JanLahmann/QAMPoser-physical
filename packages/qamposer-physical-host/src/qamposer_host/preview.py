@@ -4,6 +4,12 @@
   re-encoding ``pipeline.latest_annotated()`` each tick.
 * ``GET /debug/snapshot.jpg`` — a single JPEG frame.
 
+Both are **staff-gated**: they show the live booth camera, so they require the
+operator token as a ``?key=<token>`` query parameter (or an ``X-Operator-Key``
+header). A missing/wrong key returns ``403`` JSON. The ``/debug`` *page* shell
+itself stays open — the display app prompts for the key client-side and appends
+it to these data requests.
+
 When no pipeline or no frame is available yet, both endpoints return a generated
 placeholder image with an explanatory caption. Image libraries (cv2 / PIL) are
 imported lazily so the host stays importable without them.
@@ -14,12 +20,26 @@ from __future__ import annotations
 import asyncio
 import logging
 
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import Response, StreamingResponse
+
+from .token import token_matches
 
 logger = logging.getLogger("qamposer_host.preview")
 
 router = APIRouter()
+
+
+def require_operator_key(request: Request) -> None:
+    """Raise ``403`` unless the request carries a valid operator token.
+
+    The token is read from the ``key`` query parameter (used by the display
+    app's MJPEG ``<img>`` / snapshot fetches, which cannot set headers) or an
+    ``X-Operator-Key`` header (for programmatic callers).
+    """
+    key = request.query_params.get("key") or request.headers.get("X-Operator-Key")
+    if not token_matches(key, request.app.state.operator_token):
+        raise HTTPException(status_code=403, detail={"error": "operator_key_required"})
 
 _STREAM_INTERVAL = 0.2  # ~5 fps
 _BOUNDARY = "frame"
@@ -80,12 +100,15 @@ def _current_jpeg(request: Request) -> bytes:
 
 @router.get("/debug/snapshot.jpg")
 async def snapshot(request: Request) -> Response:
+    require_operator_key(request)
     return Response(content=_current_jpeg(request), media_type="image/jpeg",
                     headers={"Cache-Control": "no-store"})
 
 
 @router.get("/debug/stream")
 async def stream(request: Request) -> StreamingResponse:
+    require_operator_key(request)
+
     async def frames():
         while True:
             if await request.is_disconnected():

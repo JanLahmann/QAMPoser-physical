@@ -25,6 +25,7 @@ from .config import HostConfig, build_frame_source, camera_from_spec, ensure_pus
 from .hub import Hub
 from .layout import LayoutStore
 from .proxy import BackendHealth
+from .token import ensure_token
 
 logger = logging.getLogger("qamposer_host.main")
 
@@ -46,6 +47,11 @@ def create_app(
     app = FastAPI(title="Entangible host", lifespan=_lifespan)
     app.state.config = config
     app.state.hub = hub
+    # Staff credential: a single shared operator token, generated on first run
+    # and persisted next to the certs. Gates the staff/control surfaces
+    # (select_* on /ws/state, /ws/frames, /debug preview, /api/qr); viewer
+    # surfaces (`/`, `/pocket`, /ws/state reads, /api/info) stay fully open.
+    app.state.operator_token = ensure_token(config.cert_dir)
     app.state.pipeline = pipeline
     app.state.push_source = None
     app.state.source_factory = source_factory or build_frame_source

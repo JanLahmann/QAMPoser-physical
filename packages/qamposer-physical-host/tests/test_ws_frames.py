@@ -12,11 +12,13 @@ import time
 
 import numpy as np
 import pytest
-from conftest import FakePipeline
+from conftest import FakePipeline, authenticate_operator, frames_url
 from fastapi.testclient import TestClient
+from starlette.websockets import WebSocketDisconnect
 
 from qamposer_host.config import HostConfig
 from qamposer_host.main import create_app
+from qamposer_host.ws_frames import FRAMES_UNAUTHORIZED_CODE
 
 cv2 = pytest.importorskip("cv2")
 pytest.importorskip("qamposer_vision.sources")
@@ -39,12 +41,33 @@ def _jpeg() -> bytes:
     return buf.tobytes()
 
 
+def test_frames_without_key_is_closed():
+    app = _app()
+    with TestClient(app) as client:
+        with pytest.raises(WebSocketDisconnect) as exc:
+            with client.websocket_connect("/ws/frames") as ws:
+                # The server accepts then closes 4403; the first receive raises.
+                ws.receive_bytes()
+        assert exc.value.code == FRAMES_UNAUTHORIZED_CODE
+        # No push source was created for the unauthorized socket.
+        assert app.state.push_source is None
+
+
+def test_frames_with_wrong_key_is_closed():
+    app = _app()
+    with TestClient(app) as client:
+        with pytest.raises(WebSocketDisconnect) as exc:
+            with client.websocket_connect("/ws/frames?key=bogus") as ws:
+                ws.receive_bytes()
+        assert exc.value.code == FRAMES_UNAUTHORIZED_CODE
+
+
 def test_frames_create_and_fill_shared_push_source():
     app = _app()
     assert app.state.push_source is None  # not created until needed
     jpeg = _jpeg()
     with TestClient(app) as client:
-        with client.websocket_connect("/ws/frames") as ws:
+        with client.websocket_connect(frames_url(app)) as ws:
             ws.send_bytes(jpeg)
         # ensure_push_source created the shared instance on connect ...
         push = app.state.push_source
@@ -64,7 +87,7 @@ def test_select_camera_push_swaps_to_the_shared_instance():
     app = _app()
     with TestClient(app) as client:
         # A phone connects first → the shared source now exists.
-        with client.websocket_connect("/ws/frames"):
+        with client.websocket_connect(frames_url(app)):
             pass
         shared = app.state.push_source
         assert shared is not None
@@ -72,6 +95,7 @@ def test_select_camera_push_swaps_to_the_shared_instance():
         with client.websocket_connect("/ws/state") as ws:
             ws.receive_json()  # initial status
             ws.receive_json()  # replayed layout
+            authenticate_operator(ws, app)
             ws.send_json({"type": "select_camera", "kind": "push"})
             status = ws.receive_json()
             assert status["type"] == "status"
@@ -88,6 +112,7 @@ def test_select_camera_push_creates_source_when_no_frames_yet():
         with client.websocket_connect("/ws/state") as ws:
             ws.receive_json()  # initial status
             ws.receive_json()  # replayed layout
+            authenticate_operator(ws, app)
             ws.send_json({"type": "select_camera", "kind": "push"})
             ws.receive_json()  # status
         shared = app.state.push_source

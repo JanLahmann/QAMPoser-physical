@@ -1,11 +1,17 @@
 """Serve the built display app (SPA) and the capture QR code.
 
 * ``GET /api/qr?path=/capture`` — a PNG QR encoding
-  ``https://<lan-ip>:<port><path>`` (``http`` when TLS is off).
+  ``https://<lan-ip>:<port><path>?key=<operator-token>`` (``http`` when TLS is
+  off). **Staff-gated:** requires the operator token (query param or
+  ``X-Operator-Key`` header) — the QR is a staff-distribution channel, and the
+  token it embeds is what lets the scanning phone reach ``/capture`` /
+  ``/ws/frames``. A missing/wrong key returns ``403`` JSON.
 * ``GET /{path}`` (registered LAST) — serves a file from ``display_dist`` when
   it exists, otherwise falls back to ``index.html`` for SPA client routes.
   Reserved prefixes (``/api``, ``/ws``, ``/qamposer-api``, ``/debug/stream``,
-  ``/debug/snapshot``) never fall through to the SPA.
+  ``/debug/snapshot``) never fall through to the SPA. The ``/debug`` page shell
+  is served openly (it prompts for the key client-side); only the ``/debug``
+  *data* endpoints (preview stream, ``/api/qr``) are gated.
 
 If ``display_dist`` has not been built, ``/`` and SPA routes return a friendly
 "display app not built" page while ``/api``, ``/ws`` and ``/debug`` keep working.
@@ -22,6 +28,7 @@ from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse, Response
 
 from .certs import primary_lan_ip
+from .preview import require_operator_key
 
 logger = logging.getLogger("qamposer_host.static")
 
@@ -60,12 +67,22 @@ def _qr_png(url: str) -> bytes:
     return out.getvalue()
 
 
+def _with_key(path: str, token: str) -> str:
+    """Append ``key=<token>`` to a target path (staff QRs carry the token)."""
+    sep = "&" if "?" in path else "?"
+    return f"{path}{sep}key={token}"
+
+
 @router.get("/api/qr")
 async def qr(request: Request, path: str = "/capture") -> Response:
+    require_operator_key(request)
     config = request.app.state.config
     scheme = "https" if config.tls else "http"
     if not path.startswith("/"):
         path = "/" + path
+    # The scanning phone must arrive already carrying the operator token, so it
+    # can open /capture and connect to /ws/frames (both token-gated).
+    path = _with_key(path, request.app.state.operator_token)
     url = f"{scheme}://{primary_lan_ip()}:{config.port}{path}"
     return Response(
         content=_qr_png(url),
@@ -89,6 +106,10 @@ async def info(request: Request) -> dict:
         "port": config.port,
         "tls": bool(config.tls),
         "captureUrl": f"{scheme}://{ip}:{config.port}/capture",
+        # Additive: advertise that this host enforces the operator token, so
+        # clients can detect a token-gated booth. (The token itself is never
+        # exposed here — /api/info is an open, read-only surface.)
+        "security": {"operator": True},
     }
 
 

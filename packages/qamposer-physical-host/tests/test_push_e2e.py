@@ -20,6 +20,7 @@ import threading
 import time
 
 import pytest
+from conftest import frames_url, operator_hello
 from fastapi.testclient import TestClient
 
 from qamposer_host.config import HostConfig
@@ -84,10 +85,14 @@ def test_push_frames_drive_h_then_bell_over_ws_state():
             drainer = threading.Thread(target=drain, daemon=True)
             drainer.start()
 
-            # Swap the pipeline onto the shared push source.
+            # Authenticate as operator, then swap the pipeline onto the shared
+            # push source. (The hello_ack is absorbed by the drain thread; the
+            # server processes this socket's messages in order, so the operator
+            # standing is set before select_camera is handled.)
+            state_ws.send_json(operator_hello(app))
             state_ws.send_json({"type": "select_camera", "kind": "push"})
 
-            with client.websocket_connect("/ws/frames") as frames_ws:
+            with client.websocket_connect(frames_url(app)) as frames_ws:
                 frames_ws.send_json({"type": "hello", "role": "capture"})
                 for _ in range(12):
                     frames_ws.send_bytes(h_jpeg)

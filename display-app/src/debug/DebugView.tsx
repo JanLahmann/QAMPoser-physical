@@ -9,6 +9,12 @@
 import { useEffect, useState, type CSSProperties } from 'react';
 import { useEntangibleState } from '../ws/useEntangibleState';
 import { getStateSocket } from '../ws/stateSocket';
+import {
+  clearOperatorKey,
+  getOperatorKey,
+  storeOperatorKey,
+  withKey,
+} from '../ws/operatorKey';
 import type { DisplayMode, SidebarSide, Wires } from '../ws/messages';
 import { markerLabel } from './markerLabels';
 
@@ -47,7 +53,7 @@ function PhoneCameraCard() {
       <h2>phone camera</h2>
       <div style={{ display: 'flex', gap: '1rem', alignItems: 'flex-start', flexWrap: 'wrap' }}>
         <img
-          src="/api/qr?path=/capture"
+          src={withKey('/api/qr?path=/capture')}
           alt="QR code linking to the /capture page"
           width={168}
           height={168}
@@ -239,20 +245,98 @@ function LayoutCard() {
   );
 }
 
+/**
+ * Operator-key prompt shown on a keyless `/debug` visit. The staff QR opens
+ * `/debug?key=…` (auto-stored, no prompt); typing the token here stores it and
+ * reloads so the preview/QR/WS all pick it up.
+ */
+function OperatorKeyPrompt({ rejected }: { rejected?: boolean }) {
+  const [value, setValue] = useState('');
+  const submit = (e: React.FormEvent) => {
+    e.preventDefault();
+    const key = value.trim();
+    if (!key) return;
+    storeOperatorKey(key);
+    globalThis.location?.reload();
+  };
+  return (
+    <div className="debug" style={{ display: 'grid', placeItems: 'center' }}>
+      <section className="debug__section" style={{ maxWidth: '30rem', width: '100%' }}>
+        <h2>operator key required</h2>
+        <p className="debug__muted" style={{ marginBottom: '0.75rem' }}>
+          {rejected
+            ? 'That key was rejected. Enter the current booth operator token.'
+            : 'Enter the booth operator token, or open /debug from the staff QR.'}
+        </p>
+        <form onSubmit={submit} style={{ display: 'flex', gap: '0.5rem' }}>
+          <input
+            type="text"
+            value={value}
+            onChange={(e) => setValue(e.target.value)}
+            placeholder="operator token"
+            autoFocus
+            style={{
+              flex: 1,
+              fontFamily: 'var(--ent-mono)',
+              padding: '0.4rem 0.6rem',
+              borderRadius: 6,
+              border: '1px solid var(--ent-border, #333)',
+              background: 'transparent',
+              color: 'var(--ent-text, #e6e6ea)',
+            }}
+          />
+          <button type="submit" style={{ padding: '0.4rem 1rem', borderRadius: 6 }}>
+            Unlock
+          </button>
+        </form>
+      </section>
+    </div>
+  );
+}
+
 export function DebugView() {
-  const { detection, status, connectionState } = useEntangibleState();
+  const { detection, status, connectionState, operator } = useEntangibleState();
+
+  // Gate the staff diagnostics behind the operator key. The page shell is
+  // served openly by the host; the key lives client-side (localStorage / the
+  // `?key=` the staff QR carries) and is appended to the gated data requests.
+  const hasKey = getOperatorKey() !== null;
+  if (!hasKey) return <OperatorKeyPrompt />;
+  // A stored-but-wrong key: the socket's hello_ack came back as a viewer.
+  if (operator === false) return <OperatorKeyPrompt rejected />;
 
   const board = detection?.board;
   const markers = detection?.markers ?? [];
   const warnings = detection?.warnings ?? [];
 
+  const clearKey = () => {
+    clearOperatorKey();
+    globalThis.location?.reload();
+  };
+
   return (
     <div className="debug">
       <div className="debug__left">
-        <div className="debug__panel-label">annotated preview · /debug/stream</div>
+        <div className="debug__panel-label">
+          annotated preview · /debug/stream
+          <button
+            type="button"
+            onClick={clearKey}
+            title="Forget the operator key on this device"
+            style={{
+              marginLeft: '0.75rem',
+              padding: '0.1rem 0.5rem',
+              fontSize: '0.75rem',
+              borderRadius: 4,
+              cursor: 'pointer',
+            }}
+          >
+            change key
+          </button>
+        </div>
         <img
           className="debug__stream"
-          src="/debug/stream"
+          src={withKey('/debug/stream')}
           alt="Live annotated camera preview"
         />
       </div>

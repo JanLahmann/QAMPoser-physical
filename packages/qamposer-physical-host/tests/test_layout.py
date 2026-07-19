@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from conftest import FakePipeline
+from conftest import FakePipeline, authenticate_operator
 from fastapi.testclient import TestClient
 
 from qamposer_host.config import HostConfig
@@ -100,6 +100,7 @@ def test_ws_select_mode_broadcasts_and_persists(tmp_path):
         with client.websocket_connect("/ws/state") as ws:
             ws.receive_json()   # status
             ws.receive_json()   # seeded layout (replayed after status)
+            authenticate_operator(ws, app)
             ws.send_json({"type": "select_mode", "mode": "golf"})
             layout = ws.receive_json()
             assert layout["type"] == "layout"
@@ -119,6 +120,7 @@ def test_ws_select_layout_partial(tmp_path):
         with client.websocket_connect("/ws/state") as ws:
             ws.receive_json()   # status
             ws.receive_json()   # seeded layout
+            authenticate_operator(ws, app)
             ws.send_json({"type": "select_layout", "panels": ["results", "qasm"]})
             layout = ws.receive_json()
             assert layout["sidebar"] == "right"          # unchanged
@@ -133,6 +135,7 @@ def test_layout_replayed_to_late_joiner(tmp_path):
         with client.websocket_connect("/ws/state") as ws1:
             ws1.receive_json()  # status
             ws1.receive_json()  # seeded layout
+            authenticate_operator(ws1, app)
             ws1.send_json({"type": "select_layout", "sidebar": "left"})
             ws1.receive_json()  # updated layout broadcast
 
@@ -195,6 +198,7 @@ def test_ws_select_layout_wires_broadcasts(tmp_path):
         with client.websocket_connect("/ws/state") as ws:
             ws.receive_json()  # status
             ws.receive_json()  # seeded layout
+            authenticate_operator(ws, app)
             ws.send_json({"type": "select_layout", "wires": "all"})
             layout = ws.receive_json()
             assert layout["wires"] == "all"

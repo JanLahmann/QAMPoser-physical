@@ -123,18 +123,34 @@ export interface LayoutMessage {
   wires: Wires;
 }
 
+/**
+ * `hello_ack` — server's reply to a `hello` (additive). Tells the socket its
+ * standing: `operator` when the `hello` carried a matching operator `key`,
+ * else `viewer`. Viewers may still read all state; only operators may send the
+ * `select_*` control messages.
+ */
+export interface HelloAck {
+  type: 'hello_ack';
+  role: 'viewer' | 'operator';
+}
+
 /** Discriminated union of everything the server can push on `/ws/state`. */
 export type ServerMessage =
   | CircuitMessage
   | DetectionMessage
   | StatusMessage
-  | LayoutMessage;
+  | LayoutMessage
+  | HelloAck;
 
 // ---------------------------------------------------------------------------
 // Client → server messages
 // ---------------------------------------------------------------------------
 
-export type ClientRole = 'display' | 'debug' | 'capture-ui';
+/**
+ * `display` / `debug` / `capture-ui` are courtesy labels; `operator` is the
+ * privileged role that (with a matching `key`) unlocks the `select_*` controls.
+ */
+export type ClientRole = 'display' | 'debug' | 'capture-ui' | 'operator';
 
 /** `hello` — courtesy metadata; the server must not require it. */
 export interface ClientHello {
@@ -142,6 +158,8 @@ export interface ClientHello {
   role: ClientRole;
   /** Free-form label, optional. */
   client?: string;
+  /** Operator token — required only to act as `operator` (staff); others omit it. */
+  key?: string;
 }
 
 /** `select_camera` — swap the pipeline's frame source at runtime. */
@@ -176,7 +194,13 @@ export type ClientMessage = ClientHello | SelectCamera | SelectMode | SelectLayo
 // ---------------------------------------------------------------------------
 
 /** Every `type` the server can send on `/ws/state`. */
-export const SERVER_MESSAGE_TYPES = ['circuit', 'detection', 'status', 'layout'] as const;
+export const SERVER_MESSAGE_TYPES = [
+  'circuit',
+  'detection',
+  'status',
+  'layout',
+  'hello_ack',
+] as const;
 
 /** Every `type` the client can send on `/ws/state`. */
 export const CLIENT_MESSAGE_TYPES = [

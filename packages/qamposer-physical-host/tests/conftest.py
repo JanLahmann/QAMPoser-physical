@@ -10,6 +10,40 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any
 
+import pytest
+
+
+@pytest.fixture(autouse=True)
+def _isolated_cert_dir(tmp_path_factory, monkeypatch):
+    """Point the operator-token / cert dir at a throwaway path per test.
+
+    ``create_app`` generates the operator token under ``config.cert_dir`` on
+    startup; without this the suite would write a token file into the developer's
+    real ``~/.qamposer-physical/certs``. Setting ``QAMPOSER_CERT_DIR`` keeps every
+    ``HostConfig.from_env(...)`` in the suite isolated and reproducible.
+    """
+    cert_dir = tmp_path_factory.mktemp("certs")
+    monkeypatch.setenv("QAMPOSER_CERT_DIR", str(cert_dir))
+    return cert_dir
+
+
+def operator_hello(app) -> dict:
+    """A ``hello`` payload that authenticates as operator for ``app``'s token."""
+    return {"type": "hello", "role": "operator", "key": app.state.operator_token}
+
+
+def frames_url(app, path: str = "/ws/frames") -> str:
+    """``/ws/frames`` URL carrying ``app``'s operator token as ``?key=``."""
+    sep = "&" if "?" in path else "?"
+    return f"{path}{sep}key={app.state.operator_token}"
+
+
+def authenticate_operator(ws, app) -> None:
+    """Send an operator ``hello`` on ``ws`` and consume the ``hello_ack``."""
+    ws.send_json(operator_hello(app))
+    ack = ws.receive_json()
+    assert ack == {"type": "hello_ack", "role": "operator"}
+
 
 @dataclass
 class FakeMarker:

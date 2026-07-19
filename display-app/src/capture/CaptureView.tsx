@@ -35,6 +35,7 @@ import {
   type ZoomRange,
 } from './zoom';
 import { StateSocket } from '../ws/stateSocket';
+import { getOperatorKey, withKey } from '../ws/operatorKey';
 import './capture.css';
 
 const ZOOM_STORAGE_KEY = 'entangible.capture.zoom';
@@ -367,9 +368,11 @@ export function CaptureView() {
       // Fresh controller per session so counters/fps start clean.
       controllerRef.current = new StreamController();
 
-      // Dedicated binary frames socket.
+      // Dedicated binary frames socket. The page is opened from the staff QR
+      // (which carries `?key=`), so pass the operator token through to the
+      // token-gated /ws/frames endpoint.
       setFramesConn('connecting');
-      const ws = new WebSocket(framesSocketUrl());
+      const ws = new WebSocket(withKey(framesSocketUrl()));
       ws.binaryType = 'arraybuffer';
       framesWsRef.current = ws;
       ws.onopen = () => {
@@ -386,8 +389,13 @@ export function CaptureView() {
       };
 
       // capture-ui state socket → ask the host to swap onto the push source.
+      // select_camera is operator-gated, so authenticate with the QR's key.
       selectSentRef.current = false;
-      const stateSocket = new StateSocket({ role: 'capture-ui', client: 'phone' });
+      const stateSocket = new StateSocket({
+        role: 'capture-ui',
+        client: 'phone',
+        operatorKey: () => getOperatorKey(),
+      });
       stateSocketRef.current = stateSocket;
       stateUnsubRef.current = stateSocket.subscribe((snap) => {
         if (snap.connectionState === 'open' && !selectSentRef.current) {

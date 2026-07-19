@@ -19,10 +19,12 @@ import type {
   ClientMessage,
   ClientRole,
   DetectionMessage,
+  HelloAck,
   LayoutMessage,
   ServerMessage,
   StatusMessage,
 } from './messages';
+import { getOperatorKey } from './operatorKey';
 
 export type ConnectionState =
   | 'connecting'
@@ -42,6 +44,12 @@ export interface StateSnapshot {
   readonly connectionState: ConnectionState;
   /** Last accepted circuit `seq`, or null before any circuit arrives. */
   readonly lastSeq: number | null;
+  /**
+   * Operator standing from the server's `hello_ack`: `true` when this socket
+   * authenticated as an operator, `false` after a viewer ack, `undefined`
+   * before any ack. Drives the `/debug` "wrong key" affordance.
+   */
+  readonly operator?: boolean;
 }
 
 // Backoff bounds (see protocol.md "Reconnect rules").
@@ -76,6 +84,13 @@ export interface StateSocketOptions {
   clearTimeoutImpl?: (id: TimeoutId) => void;
   /** Jitter source in [0, 1). Injected for deterministic tests. */
   random?: () => number;
+  /**
+   * Resolves the operator token to send in `hello` (staff surfaces only).
+   * When it returns a non-empty string the `hello` is sent as
+   * `{role:'operator', key}` — unlocking the `select_*` controls. Omitted (or
+   * returning null) → a plain viewer `hello`, exactly as before.
+   */
+  operatorKey?: () => string | null | undefined;
 }
 
 export type Listener = (snapshot: StateSnapshot) => void;
@@ -95,6 +110,7 @@ export class StateSocket {
   private readonly setTimeoutImpl: (fn: () => void, ms: number) => TimeoutId;
   private readonly clearTimeoutImpl: (id: TimeoutId) => void;
   private readonly random: () => number;
+  private readonly operatorKey?: () => string | null | undefined;
 
   private ws: WebSocket | null = null;
   private reconnectAttempt = 0;
@@ -116,6 +132,7 @@ export class StateSocket {
       options.setTimeoutImpl ?? ((fn, ms) => setTimeout(fn, ms));
     this.clearTimeoutImpl = options.clearTimeoutImpl ?? ((id) => clearTimeout(id));
     this.random = options.random ?? Math.random;
+    this.operatorKey = options.operatorKey;
   }
 
   // --- public API ---------------------------------------------------------
@@ -184,6 +201,14 @@ export class StateSocket {
       this.reconnectAttempt = 0;
       const hello: ClientHello = { type: 'hello', role: this.role };
       if (this.client) hello.client = this.client;
+      // Authenticate as operator when a key is available (staff surfaces). The
+      // server requires role === 'operator' AND a matching key, so we override
+      // the role here; viewer sockets (no key) keep their courtesy role.
+      const key = this.operatorKey?.();
+      if (key) {
+        hello.role = 'operator';
+        hello.key = key;
+      }
       try {
         ws.send(JSON.stringify(hello));
       } catch {
@@ -244,6 +269,9 @@ export class StateSocket {
       case 'layout':
         this.patch({ layout: msg });
         break;
+      case 'hello_ack':
+        this.patch({ operator: (msg as HelloAck).role === 'operator' });
+        break;
       default:
         // Unknown `type` — additive protocol change; ignore per spec.
         break;
@@ -278,7 +306,14 @@ let singleton: StateSocket | null = null;
 /** Lazily create (and start) the shared display-role socket. */
 export function getStateSocket(): StateSocket {
   if (!singleton) {
-    singleton = new StateSocket({ role: 'display', client: 'booth-screen' });
+    // Carries the operator key when one is stored (e.g. on `/debug`), so the
+    // staff Layout controls are honored; on the open booth screen there is no
+    // key and the socket stays a plain viewer.
+    singleton = new StateSocket({
+      role: 'display',
+      client: 'booth-screen',
+      operatorKey: () => getOperatorKey(),
+    });
   }
   return singleton;
 }

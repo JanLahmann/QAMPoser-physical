@@ -2,9 +2,12 @@
 
 Subcommands:
 
-* ``run``  — start the kiosk host under uvicorn, with self-signed TLS by
+* ``run``   — start the kiosk host under uvicorn, with self-signed TLS by
   default (``--no-tls`` for plain-HTTP dev). ``--open`` launches a browser.
-* ``qr``   — print the phone-capture URL as an ASCII QR code to the terminal.
+* ``qr``    — print the phone-capture URL (with the operator key embedded) as an
+  ASCII QR code to the terminal.
+* ``token`` — print the shared operator token (generating it on first use);
+  ``--rotate`` mints a new one (invalidating previously printed staff sheets).
 """
 
 from __future__ import annotations
@@ -16,6 +19,7 @@ import webbrowser
 
 from .certs import ensure_cert, primary_lan_ip
 from .config import HostConfig
+from .token import ensure_token, rotate_token
 
 
 def _add_common(parser: argparse.ArgumentParser) -> None:
@@ -42,7 +46,14 @@ def _build_parser() -> argparse.ArgumentParser:
     _add_common(run)
 
     qr = sub.add_parser("qr", help="print the capture URL as an ASCII QR code")
+    qr.add_argument("--cert-dir", default=None, help="TLS/token cert directory")
+    qr.add_argument("--config-dir", default=None, help="config dir (default ~/.qamposer-physical)")
     _add_common(qr)
+
+    tok = sub.add_parser("token", help="print (or rotate) the shared operator token")
+    tok.add_argument("--rotate", action="store_true", help="mint a new token")
+    tok.add_argument("--cert-dir", default=None, help="TLS/token cert directory")
+    tok.add_argument("--config-dir", default=None, help="config dir (default ~/.qamposer-physical)")
 
     return parser
 
@@ -92,9 +103,15 @@ def _cmd_run(args: argparse.Namespace) -> int:
 def _cmd_qr(args: argparse.Namespace) -> int:
     import qrcode
 
-    port = args.port or HostConfig.from_env().port
+    config = HostConfig.from_env(cert_dir=args.cert_dir, config_dir=args.config_dir)
+    port = args.port or config.port
     scheme = "http" if args.no_tls else "https"
     path = args.path if args.path.startswith("/") else "/" + args.path
+    # Embed the operator token so the scanning phone arrives already
+    # authenticated for /capture + /ws/frames (both token-gated).
+    token = ensure_token(config.cert_dir)
+    sep = "&" if "?" in path else "?"
+    path = f"{path}{sep}key={token}"
     url = f"{scheme}://{primary_lan_ip()}:{port}{path}"
     qr = qrcode.QRCode(border=1)
     qr.add_data(url)
@@ -104,12 +121,21 @@ def _cmd_qr(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_token(args: argparse.Namespace) -> int:
+    config = HostConfig.from_env(cert_dir=args.cert_dir, config_dir=args.config_dir)
+    token = rotate_token(config.cert_dir) if args.rotate else ensure_token(config.cert_dir)
+    print(token)
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     args = _build_parser().parse_args(argv if argv is not None else sys.argv[1:])
     if args.command == "run":
         return _cmd_run(args)
     if args.command == "qr":
         return _cmd_qr(args)
+    if args.command == "token":
+        return _cmd_token(args)
     return 2  # pragma: no cover
 
 

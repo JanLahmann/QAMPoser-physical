@@ -10,6 +10,7 @@ import {
   type DetectionMessage,
   type StatusMessage,
   type LayoutMessage,
+  type HelloAck,
   type ClientHello,
   type SelectCamera,
   type SelectMode,
@@ -103,10 +104,16 @@ const statusSample = {
   clients: 0,
 } satisfies StatusMessage;
 
+const helloAckSample = {
+  type: 'hello_ack',
+  role: 'viewer',
+} satisfies HelloAck;
+
 const helloSample = {
   type: 'hello',
   role: 'display',
   client: '',
+  key: '',
 } satisfies ClientHello;
 
 const selectCameraSample = {
@@ -140,6 +147,7 @@ const SAMPLES: Record<string, unknown> = {
   detection: detectionSample,
   status: statusSample,
   layout: layoutSample,
+  hello_ack: helloAckSample,
   hello: helloSample,
   select_camera: selectCameraSample,
   select_mode: selectModeSample,

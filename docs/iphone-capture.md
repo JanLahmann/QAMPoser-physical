@@ -28,7 +28,10 @@ source. See [`protocol.md`](protocol.md) for the wire contract.
    ```
 2. **Get the QR / URL.** Open `/debug` on the booth screen and find the
    **Phone camera** card (QR + `https://<lan-ip>:8443/capture`), or print it in the
-   terminal with `uv run qamposer-physical qr`.
+   terminal with `uv run qamposer-physical qr`. The QR embeds the booth's
+   **operator token** as `?key=…`, so the scanned `/capture` link is
+   pre-authenticated for the token-gated frame intake — scan it fresh (don't
+   retype the URL without the `key`, or the stream will be refused).
 3. **Scan the QR** with the iPhone Camera app and open the link in **Safari**.
 
 ### Accept the self-signed certificate (iOS Safari)

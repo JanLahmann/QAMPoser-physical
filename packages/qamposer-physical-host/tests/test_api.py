@@ -36,10 +36,12 @@ def test_info_shape_tls_default():
         resp = client.get("/api/info")
         assert resp.status_code == 200
         body = resp.json()
-        assert set(body) == {"lanIp", "port", "tls", "captureUrl"}
+        assert set(body) == {"lanIp", "port", "tls", "captureUrl", "security"}
         assert body["tls"] is True
         assert isinstance(body["port"], int)
         assert body["captureUrl"] == f"https://{body['lanIp']}:{body['port']}/capture"
+        # Additive: token-enforcing hosts advertise operator security.
+        assert body["security"] == {"operator": True}
 
 
 def test_info_reflects_no_tls():
@@ -82,18 +84,56 @@ def test_reserved_prefixes_not_spa():
         assert client.get("/api/does-not-exist").status_code == 404
 
 
-def test_qr_returns_png():
-    with TestClient(_app()) as client:
-        resp = client.get("/api/qr", params={"path": "/capture"})
+def test_qr_returns_png_and_embeds_key():
+    app = _app()
+    token = app.state.operator_token
+    with TestClient(app) as client:
+        resp = client.get("/api/qr", params={"path": "/capture", "key": token})
         assert resp.status_code == 200
         assert resp.headers["content-type"] == "image/png"
         assert resp.content[:8] == b"\x89PNG\r\n\x1a\n"
-        assert resp.headers["X-Encoded-URL"].endswith("/capture")
+        # The encoded capture URL carries the operator key for the phone.
+        encoded = resp.headers["X-Encoded-URL"]
+        assert encoded.endswith(f"/capture?key={token}")
 
 
-def test_debug_snapshot_returns_jpeg_placeholder():
+def test_qr_requires_key():
+    with TestClient(_app()) as client:
+        resp = client.get("/api/qr", params={"path": "/capture"})
+        assert resp.status_code == 403
+        assert resp.json()["detail"]["error"] == "operator_key_required"
+
+        wrong = client.get("/api/qr", params={"path": "/capture", "key": "nope"})
+        assert wrong.status_code == 403
+
+
+def test_qr_accepts_header_key():
+    app = _app()
+    with TestClient(app) as client:
+        resp = client.get(
+            "/api/qr",
+            params={"path": "/capture"},
+            headers={"X-Operator-Key": app.state.operator_token},
+        )
+        assert resp.status_code == 200
+
+
+def test_debug_snapshot_requires_key():
     with TestClient(_app()) as client:
         resp = client.get("/debug/snapshot.jpg")
+        assert resp.status_code == 403
+
+
+def test_debug_snapshot_returns_jpeg_placeholder_with_key():
+    app = _app()
+    with TestClient(app) as client:
+        resp = client.get("/debug/snapshot.jpg", params={"key": app.state.operator_token})
         assert resp.status_code == 200
         assert resp.headers["content-type"] == "image/jpeg"
         assert resp.content[:2] == b"\xff\xd8"  # JPEG SOI marker
+
+
+def test_debug_stream_requires_key():
+    with TestClient(_app()) as client:
+        resp = client.get("/debug/stream")
+        assert resp.status_code == 403
