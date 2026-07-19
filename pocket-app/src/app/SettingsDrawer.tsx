@@ -12,6 +12,7 @@ import {
   useSettings,
   type InputMode,
   type Mode,
+  type NoisePreset,
   type PanelId,
   type Side,
   type Wires,
@@ -351,6 +352,26 @@ export function SettingsControl({
                   ]}
                   onChange={(wires) => settingsStore.update({ wires })}
                 />
+              </section>
+
+              <section className="pk-drawer-sec">
+                <div className="pk-label">Noise</div>
+                <Segmented<NoisePreset>
+                  value={settings.noise}
+                  options={[
+                    { value: 'off', label: 'Off' },
+                    { value: 'falcon', label: 'Falcon (2021, 5 qubits)' },
+                    { value: 'eagle', label: 'Eagle (127 qubits)' },
+                    { value: 'heron', label: "Heron (156 qubits — today's workhorse)" },
+                    { value: 'nighthawk', label: 'Nighthawk (newest generation)' },
+                  ]}
+                  onChange={(noise) => settingsStore.update({ noise })}
+                />
+                <p className="pk-drawer-hint">
+                  Overlays results with a simulated-noise series — one preset per IBM chip
+                  generation, parameters from device calibration snapshots. Composer only — golf
+                  stays ideal.
+                </p>
               </section>
 
               <section className="pk-drawer-sec">

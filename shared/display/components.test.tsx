@@ -93,6 +93,91 @@ describe('Histogram (shared)', () => {
   });
 });
 
+describe('Histogram (shared) — paired ideal + noisy series', () => {
+  // Build a 32-length physical probability vector (statevector basis ordering).
+  const noisyVec = (entries: Record<number, number>): number[] => {
+    const v = new Array<number>(32).fill(0);
+    for (const [i, p] of Object.entries(entries)) v[+i] = p;
+    return v;
+  };
+  // Bell on q0/q1, D=5: ideal peaks are 00000 (index 0) and 11000 (index 3, q0+q1).
+  // 00100 (index 4, a q2 flip) is ideal-zero — a noisy-only leakage outcome.
+  const bellNoisy = noisyVec({ 0: 0.4, 3: 0.4, 4: 0.06, 1: 0.05, 2: 0.05, 5: 0.0001 });
+
+  it('single-series rendering is unchanged when no noisy prop is given', () => {
+    const { container } = render(<Histogram circuit={bell} displayQubits={5} classPrefix="pk" />);
+    expect(container.querySelector('.pk-h-bar--noisy')).toBeNull();
+    expect(container.querySelector('.pk-h-legend')).toBeNull();
+    expect(container.querySelector('.pk-h-pair')).toBeNull();
+  });
+
+  it('renders paired bars over the UNION of ideal peaks and noisy leakage', () => {
+    const { container } = render(
+      <Histogram circuit={bell} displayQubits={5} classPrefix="pk" noisy={bellNoisy} />,
+    );
+    // A noisy bar per column + the pair wrapper.
+    expect(container.querySelector('.pk-h-bar--noisy')).not.toBeNull();
+    expect(container.querySelector('.pk-h-pair')).not.toBeNull();
+    const bits = [...container.querySelectorAll('.pk-h-col[data-bits]')].map((c) =>
+      c.getAttribute('data-bits'),
+    );
+    // Both ideal peaks are present…
+    expect(bits).toContain('00000');
+    expect(bits).toContain('11000');
+    // …and so is the ideal-zero, noisy-only leakage outcome (the whole point).
+    expect(bits).toContain('00100');
+    // A noisy outcome below the noisy floor (0.0001) is NOT surfaced.
+    expect(bits).not.toContain('10100');
+  });
+
+  it('renders the legend only in paired mode, with prop-driven labels', () => {
+    const { container } = render(
+      <Histogram
+        circuit={bell}
+        displayQubits={5}
+        classPrefix="pk"
+        noisy={bellNoisy}
+        idealLabel="perfect"
+        noisyLabel="on hardware"
+      />,
+    );
+    const legend = container.querySelector('.pk-h-legend');
+    expect(legend).not.toBeNull();
+    expect(legend?.textContent).toContain('perfect');
+    expect(legend?.textContent).toContain('on hardware');
+    expect(container.querySelector('.pk-h-swatch--noisy')).not.toBeNull();
+  });
+
+  it('D=3 fixed axis lights a noisy-only leakage column (not a dim stub)', () => {
+    // 00100 (index 4) is ideal-zero for Bell but carries noisy weight → not dim.
+    const { container } = render(
+      <Histogram circuit={bell} displayQubits={3} classPrefix="pk" noisy={bellNoisy} />,
+    );
+    expect(container.querySelectorAll('.pk-h-col').length).toBe(8);
+    expect(container.querySelector('.pk-h-bar--noisy')).not.toBeNull();
+    expect(container.querySelector('.pk-h-legend')).not.toBeNull();
+    const leak = container.querySelector('.pk-h-col[data-bits="001"]');
+    expect(leak?.className).not.toContain('is-dim');
+  });
+
+  it('with noise on, an empty circuit still renders (readout leakage), not the placeholder', () => {
+    const { container } = render(
+      <Histogram
+        circuit={circuit([])}
+        displayQubits={5}
+        classPrefix="pk"
+        noisy={noisyVec({ 0: 0.9, 1: 0.03, 2: 0.03, 4: 0.02 })}
+      />,
+    );
+    expect(container.querySelector('.pk-h-empty')).toBeNull();
+    expect(container.querySelector('.pk-h-pair')).not.toBeNull();
+    const bits = [...container.querySelectorAll('.pk-h-col[data-bits]')].map((c) =>
+      c.getAttribute('data-bits'),
+    );
+    expect(bits).toContain('00000');
+  });
+});
+
 describe('StatePanel (shared)', () => {
   it('renders bo-/pk- class names and the three stats', () => {
     for (const p of ['bo', 'pk'] as const) {

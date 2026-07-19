@@ -41,7 +41,7 @@ import { detectMatRoi } from '../vision/matDetect';
 import type { Rect } from '@shared/capture/matRoi';
 import { MessageStrip, type StripMessage } from './MessageStrip';
 import { Celebrations, LOW_POWER_PARTICLES, type CelebrationRequest } from './Celebrations';
-import { ResultsHistogram } from './ResultsHistogram';
+import { ResultsHistogram, noiseSeries } from './ResultsHistogram';
 import { QasmPanel } from './QasmPanel';
 import { StatePanel } from '@shared/display/StatePanel';
 import { ComposerHandoff } from './ComposerHandoff';
@@ -793,6 +793,14 @@ export function App() {
     [currentLevel.qubits],
   );
 
+  // In-browser noise model (composer only — golf stays ideal). Memoized on
+  // (circuit, preset, mode): the density-matrix sim is ~ms but must not re-run
+  // every render. `undefined` when off → the ideal-only chart is unchanged.
+  const noisyProbs = useMemo(
+    () => noiseSeries(circuit, settings.noise, isGolf),
+    [circuit, settings.noise, isGolf],
+  );
+
   const cameraPanel = (
     <CameraPanel
       key="camera"
@@ -811,7 +819,14 @@ export function App() {
     .map((p) => {
       switch (p) {
         case 'results':
-          return <ResultsHistogram key="results" circuit={circuit} displayQubits={displayed.qubits} />;
+          return (
+            <ResultsHistogram
+              key="results"
+              circuit={circuit}
+              displayQubits={displayed.qubits}
+              noisy={noisyProbs}
+            />
+          );
         case 'state':
           return <StatePanel key="state" circuit={circuit} classPrefix="pk" />;
         case 'qasm':

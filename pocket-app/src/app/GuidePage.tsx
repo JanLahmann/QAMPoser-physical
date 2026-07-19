@@ -146,6 +146,13 @@ export function GuidePage() {
             On another device? The <b>QR</b> button beside Transfer shows a code that opens the
             same pre-loaded Composer on your phone — scan it and your circuit is there, no typing.
           </p>
+          <p>
+            Curious why real quantum computers get different answers? Flip <b>Noise</b> on in
+            Settings to overlay the results with a simulated-noise series and watch the same circuit
+            behave the way it would on real hardware. The presets walk through four real IBM chip
+            generations — Falcon (2021), Eagle, Heron and Nighthawk — with parameters taken from
+            device calibration snapshots, so you can see, literally, how the hardware has improved.
+          </p>
         </section>
 
         {/* 3. Test without a printer */}

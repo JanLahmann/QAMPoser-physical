@@ -21,6 +21,16 @@ export type Mode = 'composer' | 'golf';
  * native editing. A connected booth viewer (`?connect=1`) overrides both.
  */
 export type InputMode = 'camera' | 'manual';
+/**
+ * In-browser noise model preset (docs/design.md, "In-browser noise model").
+ * 'off' = ideal results only; the device names overlay a noisy series on the
+ * RESULTS histogram, one per IBM chip generation (oldest → newest), parameters
+ * from device calibration snapshots. Composer-only — golf stays ideal. The
+ * canonical union lives in `@quantum/noise`; re-exported here so settings
+ * consumers keep importing it from `./settings`.
+ */
+import type { NoisePreset } from '@quantum/noise';
+export type { NoisePreset };
 export type Side = 'left' | 'right';
 export type PanelId = 'camera' | 'results' | 'state' | 'qasm';
 /**
@@ -67,6 +77,12 @@ export interface Settings {
    * triggers do NOT use this field — they connect to the serving origin.
    */
   readonly boothUrl: string | null;
+  /**
+   * In-browser noise model preset (docs/design.md). 'off' (default) = ideal
+   * results only. Persisted; URL-overridable via
+   * `?noise=falcon|eagle|heron|nighthawk`.
+   */
+  readonly noise: NoisePreset;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -82,6 +98,7 @@ export const DEFAULT_SETTINGS: Settings = {
   wires: 'compact',
   cameraId: null,
   boothUrl: null,
+  noise: 'off',
 };
 
 /**
@@ -162,6 +179,17 @@ export function parseUrlOverrides(search: string): Partial<Settings> {
   const wires = params.get('wires');
   if (wires === 'compact' || wires === 'all') out.wires = wires;
 
+  const noise = params.get('noise');
+  if (
+    noise === 'off' ||
+    noise === 'falcon' ||
+    noise === 'eagle' ||
+    noise === 'heron' ||
+    noise === 'nighthawk'
+  ) {
+    out.noise = noise;
+  }
+
   // Manual booth host override (the drawer's Booth field seeded from a link).
   const booth = params.get('booth');
   if (booth !== null) {
@@ -191,6 +219,10 @@ export function sanitize(raw: unknown): Settings {
   // time. Anything that is not a non-empty string means "no saved booth".
   const boothUrl: string | null =
     typeof r.boothUrl === 'string' && r.boothUrl.trim().length > 0 ? r.boothUrl.trim() : null;
+  const noise: NoisePreset =
+    r.noise === 'falcon' || r.noise === 'eagle' || r.noise === 'heron' || r.noise === 'nighthawk'
+      ? r.noise
+      : 'off';
   return {
     mode,
     input,
@@ -201,6 +233,7 @@ export function sanitize(raw: unknown): Settings {
     wires,
     cameraId,
     boothUrl,
+    noise,
   };
 }
 

@@ -71,6 +71,7 @@ describe('sanitize', () => {
       wires: 'compact',
       cameraId: null,
       boothUrl: null,
+      noise: 'off',
     });
   });
 
@@ -172,6 +173,43 @@ describe('wires setting', () => {
     expect(JSON.parse(storage._map.get(STORAGE_KEY)!).wires).toBe('all');
     // A fresh store reading the same storage keeps the persisted choice.
     expect(createSettingsStore({ storage }).get().wires).toBe('all');
+  });
+});
+
+describe('noise setting', () => {
+  it('parses the recognized device presets and ignores junk', () => {
+    expect(parseUrlOverrides('?noise=falcon')).toEqual({ noise: 'falcon' });
+    expect(parseUrlOverrides('?noise=eagle')).toEqual({ noise: 'eagle' });
+    expect(parseUrlOverrides('?noise=heron')).toEqual({ noise: 'heron' });
+    expect(parseUrlOverrides('?noise=nighthawk')).toEqual({ noise: 'nighthawk' });
+    expect(parseUrlOverrides('?noise=off')).toEqual({ noise: 'off' });
+    expect(parseUrlOverrides('?noise=bogus')).toEqual({});
+    expect(parseUrlOverrides('?mode=golf')).not.toHaveProperty('noise');
+  });
+
+  it('defaults to off and only accepts the four device names to override it', () => {
+    expect(sanitize({}).noise).toBe('off');
+    expect(sanitize({ noise: 'bogus' }).noise).toBe('off');
+    expect(sanitize({ noise: 42 }).noise).toBe('off');
+    expect(sanitize({ noise: 'falcon' }).noise).toBe('falcon');
+    expect(sanitize({ noise: 'eagle' }).noise).toBe('eagle');
+    expect(sanitize({ noise: 'heron' }).noise).toBe('heron');
+    expect(sanitize({ noise: 'nighthawk' }).noise).toBe('nighthawk');
+  });
+
+  it('is off by default with no storage and no url', () => {
+    expect(createSettingsStore().get().noise).toBe('off');
+    expect(DEFAULT_SETTINGS.noise).toBe('off');
+  });
+
+  it('persists a chosen preset through the store round-trip', () => {
+    const storage = fakeStorage();
+    const store = createSettingsStore({ storage });
+    store.update({ noise: 'falcon' });
+    expect(store.get().noise).toBe('falcon');
+    expect(JSON.parse(storage._map.get(STORAGE_KEY)!).noise).toBe('falcon');
+    // A fresh store over the same storage reads it back.
+    expect(createSettingsStore({ storage }).get().noise).toBe('falcon');
   });
 });
 

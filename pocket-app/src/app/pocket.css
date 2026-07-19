@@ -809,6 +809,65 @@ body,
   text-align: center;
 }
 
+/* ---- Paired (ideal + noisy) bars + legend ---------------------------- */
+
+/* The pair wrapper stands in for a single bar; the two bars fill it,
+   bottom-aligned, so the surrounding column layout is unchanged. */
+.pk-h-pair {
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 3px;
+  width: 100%;
+}
+.pk-h-pair .pk-h-bar {
+  flex: 1;
+  min-width: 0;
+  width: auto;
+}
+
+/* Noisy bar: hatched amber — distinct from the solid ideal bar by both hue and
+   texture (so it reads even in grayscale / for color-vision deficiency). */
+.pk-h-bar--noisy {
+  background: repeating-linear-gradient(
+    45deg,
+    var(--warn) 0,
+    var(--warn) 2px,
+    color-mix(in srgb, var(--warn) 40%, transparent) 2px,
+    color-mix(in srgb, var(--warn) 40%, transparent) 4px
+  );
+  opacity: 0.92;
+}
+
+.pk-h-legend {
+  display: flex;
+  gap: 1rem;
+  margin-top: 0.5rem;
+  font-size: 0.66rem;
+  color: var(--muted);
+}
+.pk-h-legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+.pk-h-swatch {
+  width: 0.7rem;
+  height: 0.7rem;
+  border-radius: 2px;
+  background: var(--bars);
+  flex: none;
+}
+.pk-h-swatch--noisy {
+  background: repeating-linear-gradient(
+    45deg,
+    var(--warn) 0,
+    var(--warn) 2px,
+    color-mix(in srgb, var(--warn) 40%, transparent) 2px,
+    color-mix(in srgb, var(--warn) 40%, transparent) 4px
+  );
+}
+
 /* ---- STATE stat rows -------------------------------------------------- */
 
 .pk-stats {

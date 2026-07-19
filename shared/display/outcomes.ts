@@ -23,6 +23,17 @@ export const ZERO_EPS = 0.001;
 export const UNIFORM_EPS = 0.004;
 /** Above this many nonzero outcomes the plain full-axis layout is abandoned. */
 export const MAX_PLAIN = 8;
+/**
+ * Paired (ideal + noisy) mode floor for a NOISY-ONLY outcome to earn a bar. Set
+ * well below `ZERO_EPS` on purpose: noisy leakage (a GHZ near-miss, a readout
+ * flip) is the pedagogic payload, so a ~0.3% error peak must survive the union
+ * even though the ideal peak there is zero. The `PAIRED_TOP_N` cap keeps this
+ * from exploding into 32 slivers when a preset smears probability everywhere.
+ */
+export const NOISY_EPS = 0.003;
+/** Top-N outcomes shown in paired mode (a touch wider than TOP_N to leave room
+ * for eroded peaks AND a few visible error outcomes side by side). */
+export const PAIRED_TOP_N = 8;
 
 export interface Outcome {
   bits: string; // one char per displayed row, top(=q0) first
@@ -35,16 +46,32 @@ export interface Outcome {
  * parity test. Leftmost bit of `bits` is q0 (the top wire).
  */
 export function displayOutcomes(circuit: Circuit, displayQubits: number): Outcome[] {
-  const D = displayQubits;
   const sv = statevector(circuit);
-  const probs = new Array<number>(1 << D).fill(0);
-  for (let i = 0; i < sv.length; i++) {
-    const p = sv[i].re * sv[i].re + sv[i].im * sv[i].im;
+  const probs = sv.map((a) => a.re * a.re + a.im * a.im);
+  return outcomesFromProbabilities(probs, displayQubits);
+}
+
+/**
+ * Marginalize a raw physical probability vector (length 2^physicalQubits, in the
+ * SAME little-endian basis-state ordering statevector.ts uses — index i has
+ * qubit q set when (i >> q) & 1) onto the `displayQubits` displayed rows,
+ * returning the 2^D outcomes in basis order. Shares the exact bit-mapping of
+ * `displayOutcomes` so an ideal series and a noisy series (from
+ * `@quantum/noise`'s `noisyProbabilities`) align outcome-for-outcome by index.
+ */
+export function outcomesFromProbabilities(
+  probs: readonly number[],
+  displayQubits: number,
+): Outcome[] {
+  const D = displayQubits;
+  const out = new Array<number>(1 << D).fill(0);
+  for (let i = 0; i < probs.length; i++) {
+    const p = probs[i];
     if (p === 0) continue;
     let idx = 0;
     // r = 0 (q0) contributes the most-significant bit → top wire on the left.
     for (let r = 0; r < D; r++) idx = (idx << 1) | ((i >> r) & 1);
-    probs[idx] += p;
+    out[idx] += p;
   }
-  return probs.map((prob, idx) => ({ bits: idx.toString(2).padStart(D, '0'), prob }));
+  return out.map((prob, idx) => ({ bits: idx.toString(2).padStart(D, '0'), prob }));
 }

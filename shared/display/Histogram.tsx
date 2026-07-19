@@ -19,6 +19,16 @@
  *   - D = 4 / 5: zero states hidden, > 8 nonzero → sorted top-6 + tail, a
  *     uniform spread → the compact micro pattern + callout.
  *
+ * Paired (ideal + noisy) mode — OPTIONAL, opt-in via the `noisy` prop (a raw
+ * physical probability vector from `@quantum/noise`'s `noisyProbabilities`, same
+ * basis ordering as the statevector). Each outcome then renders a paired bar:
+ * the ideal probability (solid, current styling) beside the noisy one (hatched,
+ * `${prefix}-h-bar--noisy`). The displayed set is the UNION of ideal outcomes
+ * above `ZERO_EPS` and noisy outcomes above `NOISY_EPS`, so a noisy-only leakage
+ * outcome (a GHZ near-miss, a readout flip) — the whole pedagogic point —
+ * surfaces even where the ideal peak is zero. Without the prop nothing below
+ * changes (backwards compatible).
+ *
  * Two behavioural seams parametrize a small pre-SC2 drift between the apps
  * (kept, not silently normalized — see the SC2 report):
  *   - `microColData`: whether the uniform-superposition micro columns carry
@@ -31,8 +41,11 @@ import type { Circuit } from '@qamposer/react';
 import { activeQubits } from '@quantum/statevector';
 import {
   displayOutcomes,
+  outcomesFromProbabilities,
   TOP_N,
   ZERO_EPS,
+  NOISY_EPS,
+  PAIRED_TOP_N,
   UNIFORM_EPS,
   MAX_PLAIN,
   type Outcome,
@@ -58,27 +71,115 @@ function Guide({ rows, classPrefix }: { rows: number[]; classPrefix: string }) {
   );
 }
 
+/** Legend shown only in paired mode; label text is prop-driven for localization. */
+function Legend({
+  classPrefix,
+  idealLabel,
+  noisyLabel,
+}: {
+  classPrefix: string;
+  idealLabel: string;
+  noisyLabel: string;
+}) {
+  const p = classPrefix;
+  return (
+    <div className={`${p}-h-legend`}>
+      <span className={`${p}-h-legend-item`}>
+        <span className={`${p}-h-swatch`} aria-hidden="true" />
+        {idealLabel}
+      </span>
+      <span className={`${p}-h-legend-item`}>
+        <span className={`${p}-h-swatch ${p}-h-swatch--noisy`} aria-hidden="true" />
+        {noisyLabel}
+      </span>
+    </div>
+  );
+}
+
+/**
+ * The ideal + noisy bar pair for one column. The wrapper occupies exactly the
+ * vertical space a single bar of `max(ideal, noisy)` would (so the surrounding
+ * column layout is identical to single-series mode); the two bars then fill it
+ * proportionally, bottom-aligned.
+ */
+function PairedBars({
+  classPrefix,
+  ideal,
+  noisy,
+  scale,
+}: {
+  classPrefix: string;
+  ideal: number;
+  noisy: number;
+  /** Largest paired value across the shown columns — the 72% full-height ref. */
+  scale: number;
+}) {
+  const p = classPrefix;
+  const top = Math.max(ideal, noisy);
+  const height = scale > 0 ? `${(top / scale) * 72}%` : '0%';
+  const inner = (v: number) => (top > 0 ? `${(v / top) * 100}%` : '0%');
+  return (
+    <div className={`${p}-h-pair`} style={{ height }}>
+      <div className={`${p}-h-bar`} style={{ height: inner(ideal) }} />
+      <div className={`${p}-h-bar ${p}-h-bar--noisy`} style={{ height: inner(noisy) }} />
+    </div>
+  );
+}
+
+/** A paired outcome: same bits, an ideal probability and a noisy one. */
+interface PairedOutcome {
+  bits: string;
+  ideal: number;
+  noisy: number;
+}
+
 export function Histogram({
   circuit,
   displayQubits,
   classPrefix,
   microColData = false,
   uniformSuffix = '',
+  noisy,
+  idealLabel = 'ideal',
+  noisyLabel = 'with noise',
 }: {
   circuit: Circuit;
   displayQubits: number;
   classPrefix: string;
   microColData?: boolean;
   uniformSuffix?: string;
+  /**
+   * OPTIONAL noisy series: a raw physical probability vector (length 2^physical
+   * qubits, statevector basis ordering) — pass `noisyProbabilities(circuit,
+   * params)`. Present → paired bars + a legend; absent → the ideal-only chart is
+   * byte-for-byte unchanged.
+   */
+  noisy?: readonly number[];
+  /** Legend label for the ideal series (paired mode only). */
+  idealLabel?: string;
+  /** Legend label for the noisy series (paired mode only). */
+  noisyLabel?: string;
 }) {
   const p = classPrefix;
   const D = displayQubits;
   const outcomes = useMemo(() => displayOutcomes(circuit, D), [circuit, D]);
   const rows = useMemo(() => Array.from({ length: D }, (_, r) => r), [D]);
+  const noisyOutcomes = useMemo(
+    () => (noisy ? outcomesFromProbabilities(noisy, D) : null),
+    [noisy, D],
+  );
+  const paired = noisyOutcomes !== null;
 
   // D = 3: fixed 8-column axis; zero columns are dim stubs, never hidden.
   if (D === 3) {
-    const max = outcomes.reduce((m, o) => Math.max(m, o.prob), 0) || 1;
+    // A column is a dim stub only when BOTH series are ~zero there — a noisy-only
+    // leakage column stays lit so its error bar is visible.
+    const noisyAt = (bits: string) => noisyOutcomes!.find((o) => o.bits === bits)?.prob ?? 0;
+    const max =
+      outcomes.reduce(
+        (m, o) => Math.max(m, o.prob, paired ? noisyAt(o.bits) : 0),
+        0,
+      ) || 1;
     return (
       <div>
         <div className={`${p}-label`}>Results · 8 outcomes</div>
@@ -86,40 +187,102 @@ export function Histogram({
           <div className={`${p}-h-plot`}>
             <Guide rows={rows} classPrefix={p} />
             {outcomes.map((o) => {
-              const dim = o.prob <= ZERO_EPS;
+              const ni = paired ? noisyAt(o.bits) : 0;
+              const dim = o.prob <= ZERO_EPS && ni <= ZERO_EPS;
               return (
                 <div
                   className={`${p}-h-col ${dim ? 'is-dim' : ''}`}
                   key={o.bits}
                   data-bits={o.bits}
                   data-prob={o.prob}
-                  title={`${o.bits}: ${(o.prob * 100).toFixed(1)}%`}
+                  title={
+                    paired
+                      ? `${o.bits}: ${idealLabel} ${(o.prob * 100).toFixed(1)}% · ${noisyLabel} ${(ni * 100).toFixed(1)}%`
+                      : `${o.bits}: ${(o.prob * 100).toFixed(1)}%`
+                  }
                 >
                   <span className={`${p}-h-pct`}>
                     {o.prob >= 0.05 ? `${Math.round(o.prob * 100)}%` : ''}
                   </span>
-                  <div
-                    className={`${p}-h-bar`}
-                    style={{ height: dim ? '2px' : `${(o.prob / max) * 72}%` }}
-                  />
+                  {paired ? (
+                    <PairedBars classPrefix={p} ideal={o.prob} noisy={ni} scale={max} />
+                  ) : (
+                    <div
+                      className={`${p}-h-bar`}
+                      style={{ height: dim ? '2px' : `${(o.prob / max) * 72}%` }}
+                    />
+                  )}
                   <BitStack bits={o.bits} classPrefix={p} />
                 </div>
               );
             })}
           </div>
+          {paired && (
+            <Legend classPrefix={p} idealLabel={idealLabel} noisyLabel={noisyLabel} />
+          )}
         </div>
       </div>
     );
   }
 
-  // D >= 4: booth strategy over the D-qubit outcome list.
+  // D >= 4: booth strategy over the D-qubit outcome list. An empty board shows
+  // the placeholder — UNLESS a noisy series is on, where even an identity circuit
+  // leaks (readout flips) and that leakage is exactly what we want to show.
   const active = activeQubits(circuit);
-  if (active.length === 0) {
+  if (active.length === 0 && !paired) {
     return (
       <div>
         <div className={`${p}-label`}>Results</div>
         <div className={`${p}-well`}>
           <div className={`${p}-h-empty`}>Place a tile to see outcomes</div>
+        </div>
+      </div>
+    );
+  }
+
+  // ----- Paired (ideal + noisy) union path -----
+  if (paired) {
+    const merged: PairedOutcome[] = outcomes.map((o, i) => ({
+      bits: o.bits,
+      ideal: o.prob,
+      noisy: noisyOutcomes![i].prob,
+    }));
+    // Union: keep an outcome if EITHER series clears its floor (the noisy floor
+    // is deliberately low — leakage is the lesson), then rank by the taller bar.
+    const sig = merged
+      .filter((m) => m.ideal > ZERO_EPS || m.noisy > NOISY_EPS)
+      .sort((a, b) => Math.max(b.ideal, b.noisy) - Math.max(a.ideal, a.noisy));
+    const shown = sig.slice(0, PAIRED_TOP_N);
+    const tail = sig.slice(PAIRED_TOP_N);
+    const max = shown.reduce((m, x) => Math.max(m, x.ideal, x.noisy), 0) || 1;
+    return (
+      <div>
+        <div className={`${p}-label`}>
+          {tail.length > 0 ? `Results · top ${shown.length}` : `Results · ${shown.length} outcomes`}
+        </div>
+        <div className={`${p}-well`}>
+          <div className={`${p}-h-plot`}>
+            <Guide rows={rows} classPrefix={p} />
+            {shown.map((o) => (
+              <div
+                className={`${p}-h-col`}
+                key={o.bits}
+                data-bits={o.bits}
+                data-prob={o.ideal}
+                title={`${o.bits}: ${idealLabel} ${(o.ideal * 100).toFixed(1)}% · ${noisyLabel} ${(o.noisy * 100).toFixed(1)}%`}
+              >
+                <span className={`${p}-h-pct`}>
+                  {o.ideal >= 0.05 ? `${Math.round(o.ideal * 100)}%` : ''}
+                </span>
+                <PairedBars classPrefix={p} ideal={o.ideal} noisy={o.noisy} scale={max} />
+                <BitStack bits={o.bits} classPrefix={p} />
+              </div>
+            ))}
+          </div>
+          {tail.length > 0 && (
+            <div className={`${p}-h-tail`}>+ {tail.length} more outcomes</div>
+          )}
+          <Legend classPrefix={p} idealLabel={idealLabel} noisyLabel={noisyLabel} />
         </div>
       </div>
     );
