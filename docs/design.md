@@ -172,6 +172,30 @@ right-sized for a booth appliance.
 Consequences: features ship once for all roles; one deploy/test surface; M5
 (RasQberry packaging) serves the same app that runs at entangible.org.
 
+### Take it home — run on real hardware (DECIDED per Jan 2026-07-19; T1 anytime, T2 after U1)
+
+The visitor journey's final act: physically build → see it on your phone →
+run it on a real IBM quantum computer. Phases:
+- **T1 QASM handoff** (standalone pocket, pre-U1 OK): "Take it home" section —
+  Copy QASM / Download .qasm / Web-Share (AirDrop, mail). QASM is the
+  interchange; Composer ingests .qasm uploads (documented path).
+- **T2 viewer integration**: the visitor-QR Display role carries the same
+  handoff — the booth-built circuit leaves on the visitor's phone.
+- **T3 "Open in IBM Composer" guide**: Guide section with the account steps
+  (free Open Plan) + upload + Run-on-QPU. During implementation, probe for an
+  undocumented circuit-in-URL param (current cloud Composer documents only
+  .qasm upload; old IQX had `?initial=`) — if found, one-tap prefill.
+- **T4 Qiskit snippet**: generated copy-ready code (their circuit + SamplerV2
+  boilerplate + clearly marked key/CRN slots) for Lab/local execution.
+
+**Decision: NO in-app API-key/CRN entry.** Rationale: IBM's runtime API is
+not browser-CORS-open, so in-app runs would proxy visitor credentials through
+our server (unacceptable custody); and normalizing credential entry into
+QR-opened third-party apps is an anti-pattern regardless of our
+trustworthiness. T3/T4 achieve the same outcome with all credential moments
+on IBM's own domain. Revisit only if IBM ships an OAuth device flow with
+browser CORS.
+
 ### Quantum Golf — DECIDED (per Jan 2026-07-19, build today)
 
 Unifies the former "Bloch Golf" and "Q-sphere Golf" ideas under one name and
