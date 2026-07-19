@@ -25,6 +25,7 @@ import { MessageStrip, type StripMessage } from './MessageStrip';
 import { Celebrations, LOW_POWER_PARTICLES, type CelebrationRequest } from './Celebrations';
 import { ResultsHistogram } from './ResultsHistogram';
 import { QasmPanel } from './QasmPanel';
+import { TransferButton } from './TransferButton';
 import { QSphereView } from '@quantum/QSphereView';
 import { BlochView } from '@quantum/BlochView';
 import { Scorecard } from './Scorecard';
@@ -498,12 +499,14 @@ export function App() {
       )}
       {hasPanel('state') && <StatePanel key="state" circuit={circuit} />}
       {hasPanel('qasm') && <QasmPanel key="qasm" circuit={circuit} />}
+      <TransferButton key="transfer" circuit={circuit} onToast={pushStrip} />
       {settings.debug && <DebugPanel key="debug" frame={lastFrameRef.current} fps={camera.fps} />}
     </>
   ) : (
     <>
       {showCamera && cameraPanel}
       {composerPanels}
+      <TransferButton key="transfer" circuit={circuit} onToast={pushStrip} />
       {settings.debug && <DebugPanel key="debug" frame={lastFrameRef.current} fps={camera.fps} />}
     </>
   );

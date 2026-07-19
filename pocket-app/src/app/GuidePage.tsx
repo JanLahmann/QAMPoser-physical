@@ -118,6 +118,17 @@ export function GuidePage() {
           </p>
         </section>
 
+        {/* 2b. Run it for real */}
+        <section className="pk-guide-sec">
+          <Label>Run it for real</Label>
+          <p>
+            Built something you like? The <b>Transfer to IBM Composer</b> button copies your
+            circuit's QASM and opens IBM Quantum Composer in a new tab. In the Composer, choose
+            <b> View → Code Editor</b> and paste to load your circuit. A free IBM Quantum account
+            (the Open Plan) then lets you run it on a real quantum computer.
+          </p>
+        </section>
+
         {/* 3. Test without a printer */}
         <section className="pk-guide-sec">
           <Label>Test without a printer</Label>

@@ -155,6 +155,44 @@ body,
   border-color: var(--border);
 }
 
+/* Transfer-to-IBM-Composer action row (sidebar; take-it-home handoff). */
+.pk-transfer {
+  margin-top: 0.25rem;
+}
+
+.pk-transfer-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  width: 100%;
+  padding: 0.6rem 1rem;
+  font-family: var(--sans);
+  font-size: 0.92rem;
+  font-weight: 600;
+  color: #fff;
+  background: var(--accent);
+  border: 1px solid var(--accent);
+  border-radius: var(--radius);
+  cursor: pointer;
+}
+
+.pk-transfer-btn:hover {
+  filter: brightness(1.08);
+}
+
+.pk-transfer-glyph {
+  font-size: 1.05rem;
+  line-height: 1;
+}
+
+.pk-transfer-note {
+  margin: 0.35rem 0 0;
+  font-size: 0.72rem;
+  color: var(--muted);
+  line-height: 1.35;
+}
+
 /* ---- main: stage + side (landscape) ----------------------------------- */
 
 .pk-main {
