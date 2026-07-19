@@ -35,6 +35,12 @@ describe('parseUrlOverrides', () => {
     expect(parseUrlOverrides('')).toEqual({});
   });
 
+  it('reads ?input=manual|camera and ignores junk', () => {
+    expect(parseUrlOverrides('?input=manual').input).toBe('manual');
+    expect(parseUrlOverrides('?input=camera').input).toBe('camera');
+    expect(parseUrlOverrides('?input=bogus')).not.toHaveProperty('input');
+  });
+
   it('accepts a leading-? or bare query string and dedupes panels', () => {
     expect(parseUrlOverrides('panels=state,state,qasm,junk').panels).toEqual(['state', 'qasm']);
   });
@@ -57,6 +63,7 @@ describe('sanitize', () => {
     expect(sanitize(null)).toEqual(DEFAULT_SETTINGS);
     expect(sanitize({ mode: 'golf', panels: ['x', 'qasm'], side: 'left', debug: true })).toEqual({
       mode: 'golf',
+      input: 'camera',
       panels: ['qasm'],
       side: 'left',
       lowpower: false,
@@ -65,6 +72,13 @@ describe('sanitize', () => {
       cameraId: null,
       boothUrl: null,
     });
+  });
+
+  it('defaults input to camera and only accepts "manual" to override it', () => {
+    expect(sanitize({}).input).toBe('camera');
+    expect(sanitize({ input: 'bogus' }).input).toBe('camera');
+    expect(sanitize({ input: 42 }).input).toBe('camera');
+    expect(sanitize({ input: 'manual' }).input).toBe('manual');
   });
 
   it('defaults wires to compact and only accepts "all" to override it', () => {

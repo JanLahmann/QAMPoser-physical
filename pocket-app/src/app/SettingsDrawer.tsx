@@ -10,6 +10,7 @@ import {
   PANEL_IDS,
   settingsStore,
   useSettings,
+  type InputMode,
   type Mode,
   type PanelId,
   type Side,
@@ -311,6 +312,21 @@ export function SettingsControl({
                   ]}
                   onChange={(mode) => settingsStore.update({ mode })}
                 />
+              </section>
+
+              <section className="pk-drawer-sec">
+                <div className="pk-label">Input</div>
+                <Segmented<InputMode>
+                  value={settings.input}
+                  options={[
+                    { value: 'camera', label: 'Camera' },
+                    { value: 'manual', label: 'Build on screen' },
+                  ]}
+                  onChange={(input) => settingsStore.update({ input })}
+                />
+                <p className="pk-drawer-hint">
+                  No printer, no camera? Build gates on screen and play golf.
+                </p>
               </section>
 
               <section className="pk-drawer-sec">

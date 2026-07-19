@@ -14,6 +14,7 @@ import {
   ThemeProvider,
   QamposerProvider,
   CircuitEditor,
+  Operations,
   createDefaultCircuit,
   type Circuit,
 } from '@qamposer/react';
@@ -25,6 +26,7 @@ import type { Wires } from '@shared/display/wires';
 import { LocalPipelineSource } from '../sources/LocalPipelineSource';
 import { BoothSocketSource } from '../sources/BoothSocketSource';
 import { CameraRoleSource } from '../sources/CameraRoleSource';
+import { ManualEditSource, resolveActiveInput } from '../sources/ManualEditSource';
 import type { BoothMode, ConnectionPhase, StateSource, StateUpdate } from '../sources/StateSource';
 import { boothLink, useBoothLink } from './boothLink';
 import { cameraRoleLink, useCameraRole } from './cameraRoleLink';
@@ -322,6 +324,13 @@ export function App() {
   // Connected as a booth viewer when a link target is set (design: read-only
   // Display role — the visitor QR is view-only).
   const connected = boothUrl !== null;
+  // Input-source precedence (docs/design.md "Entangible One"): a connected booth
+  // viewer ALWAYS wins over `?input=manual`; otherwise the persisted/URL input
+  // mode picks manual (build-on-screen) vs the local camera pipeline.
+  const manual = resolveActiveInput({ connected, input: settings.input }) === 'manual';
+  // The on-device camera is hidden + stopped whenever the pipeline is not the
+  // active source — as a booth viewer OR in manual mode (same hand-off machinery).
+  const cameraHidden = connected || manual;
   // Staff CAMERA role (U2): the phone streams frames to a host as its camera.
   const cameraRoleState = useCameraRole();
   const cameraRole = cameraRoleState.active;
@@ -368,6 +377,9 @@ export function App() {
   // connected. `appliedCircuitRef` dedupes downstream work (moments/golf) by
   // circuit identity, so booth detection/status frames don't re-run it.
   const localSourceRef = useRef<LocalPipelineSource>(new LocalPipelineSource());
+  // Manual-edit source (no-camera build-on-screen mode). Held for the session so
+  // re-entering manual keeps the last on-screen circuit.
+  const manualSourceRef = useRef<ManualEditSource>(new ManualEditSource());
   const appliedCircuitRef = useRef<Circuit | null>(null);
   // Remembers whether the camera was running when we entered booth mode, so a
   // disconnect can resume the local pipeline cleanly.
@@ -468,6 +480,16 @@ export function App() {
     localSourceRef.current.ingest(result);
   }, []);
 
+  // Manual mode: the editor's native on-screen editing is the source of truth.
+  // Each `onCircuitChange` pushes into the manual source, which emits through the
+  // SAME applyUpdate as the camera/booth paths (simulation, moments, golf,
+  // celebrations and the Composer handoff all work identically). The source
+  // dedupes structurally, so the controlled value flowing back into the editor
+  // never re-emits (no feedback loop).
+  const onEditorChange = useCallback((next: Circuit) => {
+    manualSourceRef.current.setFromEditor(next);
+  }, []);
+
   // A chosen camera that no longer resolves: useCamera has already fallen back
   // to the default device — clear the stale id and give a gentle heads-up.
   const onCameraFallback = useCallback(() => {
@@ -555,44 +577,49 @@ export function App() {
   const cameraStopRef = useRef(camera.stop);
   cameraStopRef.current = camera.stop;
 
-  // Subscribe to the ACTIVE source: the booth socket while connected, else the
-  // local pipeline. Switching (connect/disconnect) tears the previous
-  // subscription down cleanly.
+  // Subscribe to the ACTIVE source. PRECEDENCE (docs/design.md): a connected
+  // booth viewer wins over `?input=manual`; otherwise manual mode uses the
+  // ManualEditSource, else the local camera pipeline. Switching (connect /
+  // disconnect / input toggle) tears the previous subscription down cleanly.
   useEffect(() => {
-    if (boothUrl === null) {
-      // Standalone: clear any booth metadata, listen to the local pipeline.
-      setConn(null);
-      setBoothMode(null);
-      setBoothWires(null);
+    if (boothUrl !== null) {
+      // Booth viewer (read-only). A fresh source resets the applied-circuit guard.
+      setConn('connecting');
       appliedCircuitRef.current = null;
-      const local: StateSource = localSourceRef.current;
-      const unsub = local.subscribe(applyUpdate);
-      local.start();
-      return () => unsub();
+      const source = new BoothSocketSource({ url: boothUrl });
+      const unsub = source.subscribe(applyUpdate);
+      source.start();
+      return () => {
+        unsub();
+        source.stop();
+      };
     }
-    // Booth viewer (read-only). A fresh source resets the applied-circuit guard.
-    setConn('connecting');
+    // Standalone: clear any booth metadata, listen to manual or the local pipeline.
+    setConn(null);
+    setBoothMode(null);
+    setBoothWires(null);
     appliedCircuitRef.current = null;
-    const source = new BoothSocketSource({ url: boothUrl });
+    const source: StateSource = manual ? manualSourceRef.current : localSourceRef.current;
     const unsub = source.subscribe(applyUpdate);
     source.start();
     return () => {
       unsub();
       source.stop();
     };
-  }, [boothUrl, applyUpdate]);
+  }, [boothUrl, manual, applyUpdate]);
 
   // Camera hand-off when the active source switches (design: hide the camera
-  // while viewing the booth; resume the local pipeline on disconnect if it was
-  // running before we connected).
+  // while viewing the booth OR building on screen; resume the local pipeline
+  // when we return to camera input if it was running before we left). The same
+  // machinery serves both the booth viewer and manual mode via `cameraHidden`.
   useEffect(() => {
     const cameraActive =
       cameraStatusRef.current === 'running' || cameraStatusRef.current === 'starting';
-    const action = cameraSwitchAction(connected, cameraActive, resumeCameraRef.current);
+    const action = cameraSwitchAction(cameraHidden, cameraActive, resumeCameraRef.current);
     if (action.stop) cameraStopRef.current();
     if (action.start) void cameraStartRef.current();
     resumeCameraRef.current = action.remember;
-  }, [connected]);
+  }, [cameraHidden]);
 
   // Probe our own origin for a booth host (served-by-host trigger). Cheap;
   // failures (e.g. entangible.org standalone) are ignored.
@@ -752,8 +779,8 @@ export function App() {
   const isGolf = effectiveMode === 'golf';
   const hasPanel = (p: PanelId) => settings.panels.includes(p);
   // Viewer policy (design: read-only Display role): while connected to a booth
-  // the camera UI is hidden entirely — the booth is the source of truth.
-  const showCamera = !connected && (hasPanel('camera') || camera.status !== 'idle');
+  // — or building on screen in manual mode — the camera UI is hidden entirely.
+  const showCamera = !cameraHidden && (hasPanel('camera') || camera.status !== 'idle');
   const boothPill = connectionPill(conn ?? 'connecting');
   // Camera-role offer gating (design: "connected to a host, camera role
   // selected"): only when a host is known AND an operator key is present.
@@ -775,6 +802,7 @@ export function App() {
       visible={hasPanel('camera')}
       frozen={frozen}
       onToggleFreeze={toggleFreeze}
+      onBuildOnScreen={() => settingsStore.update({ input: 'manual' })}
     />
   );
 
@@ -891,6 +919,12 @@ export function App() {
             <span className="pk-dot" aria-hidden="true" />
             <span className="pk-pill-label">{boothPill.label}</span>
           </span>
+        ) : manual ? (
+          // Manual build: no camera — the pill states the mode (switch back via
+          // the "Use camera" action button).
+          <span className="pk-pill pk-pill--mode" aria-label="Manual build" title="Manual build">
+            <span className="pk-pill-label">Manual build</span>
+          </span>
         ) : (
           <span className={`pk-pill ${camPill.cls}`} aria-label={camPill.label} title={camPill.label}>
             <span className="pk-dot" aria-hidden="true" />
@@ -909,6 +943,11 @@ export function App() {
           <button className="pk-btn is-stop" onClick={() => boothLink.disconnect()}>
             Disconnect
           </button>
+        ) : manual ? (
+          // Switch-back-to-camera action (returns to the local pipeline).
+          <button className="pk-btn" onClick={() => settingsStore.update({ input: 'camera' })}>
+            Use camera
+          </button>
         ) : servedByHost ? (
           <button className="pk-btn" onClick={() => boothLink.connect(defaultStateUrl())}>
             Connect to booth
@@ -925,7 +964,15 @@ export function App() {
       </header>
 
       <ThemeProvider defaultTheme="dark">
-        <QamposerProvider circuit={displayed} config={qamposerConfig}>
+        {/* CONTROLLED editor. In manual mode `onCircuitChange` is wired so native
+            on-screen editing drives the ManualEditSource; in camera/booth mode it
+            is omitted, so the recognized circuit is the source of truth and any
+            stray drag reverts (the pipeline re-asserts). */}
+        <QamposerProvider
+          circuit={displayed}
+          config={qamposerConfig}
+          onCircuitChange={manual ? onEditorChange : undefined}
+        >
           <main className={`pk-main ${settings.side === 'left' ? 'pk-side-left' : ''}`}>
             {/* Phone-only amber toast (footer hint ticker is hidden on phones);
                 CSS reveals it only under the phone breakpoints. */}
@@ -938,6 +985,13 @@ export function App() {
               </div>
             )}
             <section className="pk-stage">
+              {/* Manual mode: the library's own gate palette — the visible
+                  build-on-screen affordance (drag a gate onto a wire). */}
+              {manual && (
+                <div className="pk-manual-palette">
+                  <Operations />
+                </div>
+              )}
               <div
                 className={`pk-stage-editor ${editorFitState.scroll ? 'is-scroll' : ''}`}
                 ref={editorContainerRef}
@@ -996,6 +1050,7 @@ function CameraPanel({
   onFrameMat,
   matLocked = false,
   onUnlockMat,
+  onBuildOnScreen,
 }: {
   camera: ReturnType<typeof useCamera>;
   overlayRef: React.RefObject<HTMLCanvasElement>;
@@ -1003,6 +1058,12 @@ function CameraPanel({
   visible: boolean;
   frozen: boolean;
   onToggleFreeze: () => void;
+  /**
+   * Standalone camera-idle screen: a secondary "No camera? Build on screen"
+   * action — the natural discovery point for manual mode. Omitted in the camera
+   * role (streaming), where building on screen makes no sense.
+   */
+  onBuildOnScreen?: () => void;
   /**
    * CAMERA role: when set, the panel is streaming to a host — the fps chip
    * reflects the stream (not the local pipeline) and the hint reads "Streaming
@@ -1150,6 +1211,17 @@ function CameraPanel({
               <a className="pk-startcard-link" href="#guide">
                 New here? Read the guide
               </a>
+            )}
+            {!streaming && onBuildOnScreen && status !== 'error' && (
+              <button type="button" className="pk-startcard-alt" onClick={onBuildOnScreen}>
+                No camera? Build on screen
+              </button>
+            )}
+            {/* Permission denied / no camera: still offer the on-screen fallback. */}
+            {!streaming && onBuildOnScreen && status === 'error' && (
+              <button type="button" className="pk-startcard-alt" onClick={onBuildOnScreen}>
+                Build on screen instead
+              </button>
             )}
           </div>
         </div>

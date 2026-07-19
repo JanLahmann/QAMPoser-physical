@@ -14,6 +14,13 @@
 import { useSyncExternalStore } from 'react';
 
 export type Mode = 'composer' | 'golf';
+/**
+ * Input source when the app is NOT a connected booth viewer (docs/pocket.md,
+ * "Input modes"). 'camera' (default) drives the on-device vision pipeline;
+ * 'manual' hides the camera and lets you build gates on screen via the editor's
+ * native editing. A connected booth viewer (`?connect=1`) overrides both.
+ */
+export type InputMode = 'camera' | 'manual';
 export type Side = 'left' | 'right';
 export type PanelId = 'camera' | 'results' | 'state' | 'qasm';
 /**
@@ -32,6 +39,11 @@ export const PANEL_IDS: readonly PanelId[] = ['camera', 'results', 'state', 'qas
 
 export interface Settings {
   readonly mode: Mode;
+  /**
+   * Input source (docs/pocket.md, "Input modes"). Persisted; URL-overridable
+   * via `?input=manual`. Ignored while connected as a booth viewer (which wins).
+   */
+  readonly input: InputMode;
   readonly panels: readonly PanelId[];
   readonly side: Side;
   readonly lowpower: boolean;
@@ -59,6 +71,8 @@ export interface Settings {
 
 export const DEFAULT_SETTINGS: Settings = {
   mode: 'composer',
+  // Camera is the default input; manual (build-on-screen) is opt-in.
+  input: 'camera',
   // Per Jan (2026-07-18): camera + results only, on every device — the calm
   // first impression. State/QASM stay one toggle away in the drawer.
   panels: ['camera', 'results'],
@@ -130,6 +144,9 @@ export function parseUrlOverrides(search: string): Partial<Settings> {
   const mode = params.get('mode');
   if (mode === 'composer' || mode === 'golf') out.mode = mode;
 
+  const input = params.get('input');
+  if (input === 'camera' || input === 'manual') out.input = input;
+
   const side = params.get('side');
   if (side === 'left' || side === 'right') out.side = side;
 
@@ -159,6 +176,7 @@ export function parseUrlOverrides(search: string): Partial<Settings> {
 export function sanitize(raw: unknown): Settings {
   const r = (raw ?? {}) as Record<string, unknown>;
   const mode: Mode = r.mode === 'golf' ? 'golf' : 'composer';
+  const input: InputMode = r.input === 'manual' ? 'manual' : 'camera';
   const side: Side = r.side === 'left' ? 'left' : 'right';
   const panels = Array.isArray(r.panels)
     ? (r.panels.filter((p): p is PanelId => (PANEL_IDS as readonly string[]).includes(p as string)) as PanelId[])
@@ -175,6 +193,7 @@ export function sanitize(raw: unknown): Settings {
     typeof r.boothUrl === 'string' && r.boothUrl.trim().length > 0 ? r.boothUrl.trim() : null;
   return {
     mode,
+    input,
     panels,
     side,
     lowpower: r.lowpower === true,

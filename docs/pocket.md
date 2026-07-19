@@ -109,6 +109,35 @@ Serverless equivalents of the booth's /debug controls — all local
   strokes vs par) + confetti; clearing the board advances to the next hole.
   Animated state evolution deliberately absent (that's qsphere-evolution).
 
+## Input modes — camera · manual · booth-connected
+
+The standalone pocket app has three ways in to the *same* downstream (editor,
+histogram, state/qasm, golf, celebrations, Transfer) — all behind the
+`StateSource` seam, so simulation and golf behave identically whichever feeds
+them:
+
+- **camera** (default): the on-device vision pipeline (`LocalPipelineSource`) —
+  point at the printed board, tiles build the circuit.
+- **manual** (`ManualEditSource`; setting `input: camera | manual`, URL
+  `?input=manual`): the *no-printer, no-camera* fallback. The camera UI is
+  hidden entirely and `@qamposer/react`'s **native on-screen editing** drives
+  the circuit — the library's gate palette (`Operations`) plus drag-to-place on
+  the wires. Each edit flows through the same `applyUpdate`, so results, golf
+  and the Composer handoff all work (play Quantum Golf with on-screen gates).
+  The register is pinned to the physical **5 qubits** (`maxQubits: 5`); the
+  wires setting still collapses empty trailing wires for the view, so to reach
+  q3/q4 switch **Wires → all 5**. Native gate set: H, X, Y, Z, RX/RY/RZ, CNOT
+  (no native S/T/SWAP in the library, and rotation angles are typed per-gate,
+  default π/2 — see the tile-vs-palette note below). Discovery points: the
+  camera-idle start screen's *"No camera? Build on screen"* button, and
+  **Settings → Input**.
+- **booth-connected** (`BoothSocketSource`, read-only viewer — see below):
+  follows a booth host over `/ws/state`.
+
+**Precedence**: a connected booth viewer (`?connect=1` / a booth link) ALWAYS
+wins over `?input=manual` (`resolveActiveInput`); manual and camera never run
+at once. The staff camera role and the kiosk/`/debug` surfaces are unaffected.
+
 ## Display role — follow a booth (Entangible One, U1b)
 
 The pocket app has two roles behind one shell (docs/design.md "Entangible One").

@@ -1595,6 +1595,31 @@ body,
   color: var(--text);
 }
 
+/* start-card secondary action — "No camera? Build on screen" */
+.pk-startcard-alt {
+  display: block;
+  margin: 0.85rem auto 0;
+  padding: 0.5rem 0.9rem;
+  min-height: 44px;
+  font: inherit;
+  font-size: 0.85rem;
+  color: var(--text);
+  background: transparent;
+  border: 1px solid var(--entangle);
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+.pk-startcard-alt:hover {
+  background: color-mix(in srgb, var(--entangle) 14%, transparent);
+}
+
+/* Manual mode: the library's gate palette above the editable circuit. */
+.pk-manual-palette {
+  margin-bottom: 0.6rem;
+  flex: none;
+}
+
 /* settings-drawer "Guide & about" row */
 .pk-drawer-row {
   display: flex;

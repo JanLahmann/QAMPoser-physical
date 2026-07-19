@@ -32,6 +32,15 @@ Add `'S'` and `'T'` to `GateType` (gate table, colors — Z family, matrices in
 S/T tiles today that emit `RZ(π/2)`/`RZ(π/4)` as a workaround, so the screen shows
 "RZ(π/2)" where the tile in the visitor's hand says "S".
 
+*New since Entangible's manual-edit mode (2026-07-19):* the same gap now also
+shows in the on-screen `Operations` palette — there is no S/T (or SWAP) chip to
+place. Two small additions would let embedders align the palette with their
+hardware: a palette-config prop (`gates`/`allowedGates` on `Operations`) and
+optional angle-preset chips for RX/RY/RZ (Entangible's tiles come in π/4, π/2,
+π, −π/2; the palette currently only offers free-typed angles defaulting to
+π/2). Native `SWAP` would round it out (the vision layer lowers SWAP to
+3×CNOT today, which manual editing can't offer at all).
+
 ## 3. Controlled single-qubit gates (CH, CZ, CRX/CRY/CRZ…)
 
 **Repo:** qamposer-react · **Larger feature — worth discussing scope first**

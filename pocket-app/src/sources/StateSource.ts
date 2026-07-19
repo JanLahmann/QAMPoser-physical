@@ -6,8 +6,9 @@
  * introduces a small abstraction so the SAME downstream (editor, histogram,
  * state/qasm panels, golf, celebrations, Transfer) can be fed either by the
  * on-device pipeline (`LocalPipelineSource`) or by a booth host over
- * `/ws/state` (`BoothSocketSource`, read-only viewer). A third source
- * (`ManualEditSource`) is deferred to a later task.
+ * `/ws/state` (`BoothSocketSource`, read-only viewer), or driven directly by
+ * the editor's native on-screen editing (`ManualEditSource` — the no-camera
+ * fallback: build gates on screen, everything downstream unchanged).
  *
  * A source delivers `StateUpdate`s of a neutral shape — the minimal set of
  * fields today's `App` needs. The video UI (camera element, zoom, freeze,
@@ -20,7 +21,7 @@ import type { Wires } from '@shared/display/wires';
 import type { WarningInput } from '@shared/display/warnings';
 
 /** Which kind of source produced an update. */
-export type SourceKind = 'local' | 'booth';
+export type SourceKind = 'local' | 'booth' | 'manual';
 
 /** Booth display mode the pocket shell understands (attract collapses to composer). */
 export type BoothMode = 'composer' | 'golf';

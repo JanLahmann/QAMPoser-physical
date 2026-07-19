@@ -169,6 +169,11 @@ export function GuidePage() {
             Show these fullscreen on one device, point another device's camera at it. Flip images
             to "move" tiles.
           </p>
+          <p className="pk-guide-muted">
+            No printer <i>and</i> no camera? Choose <b>Build on screen</b> (Settings → Input, or the
+            button on the start screen) to place gates directly in the editor — play Quantum Golf and
+            transfer to the Composer, all with no hardware at all.
+          </p>
         </section>
 
         {/* 4. Print the real kit */}
