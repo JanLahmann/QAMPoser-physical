@@ -187,13 +187,17 @@ Consequences: features ship once for all roles; one deploy/test surface; M5
 
 **Simplified per Jan 2026-07-19: ONE "Transfer to IBM Composer" button** in
 the pocket app (visible whenever a circuit exists; also in the future viewer).
-Behavior: copy the QASM to the clipboard AND open the Composer in a new tab,
-with a confident toast: "QASM copied — in the Composer choose View → Code
-Editor and paste." (VERIFIED 2026-07-19 by analyzing the Composer's full
-8.5 MB client bundle incl. lazy chunks: the current cloud Composer has NO
-URL circuit initialization — the old IQX `?initial=` did not survive the
-platform migration. Clipboard+paste is the flow, not a fallback.) A small
-Guide note covers the free-account step. Copy/Download/Share and the Qiskit
+Behavior (SHIPPED, pocket-app/src/app/composerTransfer.ts): open the Composer
+in a new tab with the circuit PRE-LOADED via `?initial=` — the payload is
+`encodeURIComponent(LZString.compressToEncodedURIComponent(JSON.stringify(
+{title, description, qasm})))` — and copy the QASM to the clipboard as a
+belt-and-braces fallback. (URL format VERIFIED WORKING 2026-07-19: visually
+confirmed by Jan on the live cloud Composer, logged-off; rediscovered from
+the Qoffee-Maker family project, qoffeefrontend/app.js. An earlier
+bundle-forensics pass had wrongly concluded the param was dead — a negative
+grep proves nothing.) The prefill works logged-off, but RUNNING needs an
+account, so toasts + Guide point to sign-in/registration at
+quantum.cloud.ibm.com/registration (free). Copy/Download/Share and the Qiskit
 snippet remain optional extras, not requirements. Original phase sketch kept
 below for reference:
 - **T1 QASM handoff** (standalone pocket, pre-U1 OK): "Take it home" section —
