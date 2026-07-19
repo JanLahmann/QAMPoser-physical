@@ -17,8 +17,11 @@ comes out is served — by a Home-Connect coffee machine in Qoffee's case, by a
 human mixing the cocktail/ice cream in the mixer case. The uncertainty is the
 lesson: if your state isn't sharp, you get *a* drink, not *your* drink.
 
-Both are standalone stacks (Jupyter/voila + custom frontends) maintained apart
-from Entangible. Entangible already has everything expensive: circuit input
+Both are standalone stacks maintained apart from Entangible — Qoffee-Maker is
+a Dockerized Jupyter app (Home Connect env vars + `IBMQ_API_KEY`,
+`qoffee.ipynb` in App Mode); quantum-mixer is its generalized successor, an
+Angular 15 frontend + FastAPI backend whose YAML **usecases** (see the audit
+section below) already carry the coffee / ice-cream / cocktail scenarios. Entangible already has everything expensive: circuit input
 (tiles + camera, manual on-screen editing via `ManualEditSource`, replay),
 ideal + noisy simulation in the browser, a shared histogram, kiosk/viewer/
 camera/operator roles with WS state sync, a branding slot, attract mode, and
@@ -37,9 +40,11 @@ one more entry in the existing mode system, exactly like `golf`.
   ingredients):
   - **`single`** (the Qoffee classic): item count fixes the qubit count
     ⌈log₂ N⌉ (≤ 5 — the board has 5 rows; 32 items max); one shot = one item.
-  - **`shots`**: same encoding, but a serve draws `shots = k` independent
-    shots — k scoops, duplicates welcome ("2× vanilla, 1× mango" from a
-    lopsided distribution is the honest outcome).
+  - **`shots`**: same encoding, but a serve draws k independent shots — k
+    scoops, duplicates welcome ("2× vanilla, 1× mango" from a lopsided
+    distribution is the honest outcome). k is visitor-choosable within
+    pack-defined bounds — adopting quantum-mixer's proven
+    `numMeasurements: {min, max, default}` shape.
   - **`subset`**: each item is bound to ONE qubit (≤ 5 items); a single shot's
     bitstring selects the subset — set bits are the ingredients in the glass.
     Superposition = "maybe"-ingredients; **entanglement = ingredients that
@@ -72,12 +77,18 @@ tagline = "Mix your drink with a quantum computer"
 
 [serve]                      # optional; default mode = "single"
 mode  = "single"             # "single" | "shots" | "subset"
-shots = 3                    # only for mode = "shots" (1–10)
+shots = { min = 1, max = 5, default = 3 }   # mode = "shots" only; visitor picks
+                                            # within bounds (quantum-mixer's
+                                            # numMeasurements shape)
 
 [theme]                      # optional branding overrides (CSS vars on tokens.css)
 accent     = "#e91e63"
 background = "bar.jpg"       # relative to the pack dir
 logo       = "logo.svg"
+
+[[link]]                     # optional footer links (quantum-mixer externalLinks)
+name = "IBM Quantum"
+url  = "https://www.ibm.com/quantum"
 
 [[item]]
 code     = "000"             # single/shots modes; subset mode uses `qubit = 0` instead
@@ -85,7 +96,10 @@ name     = "Tropical Sunrise"
 subtitle = "orange · mango · grenadine"
 image    = "sunrise.jpg"     # relative path; emoji used when absent
 emoji    = "🍹"
-program  = ""                # optional dispatch payload (MX4)
+
+[item.program]               # optional dispatch payload (MX4); Home Connect shape
+key     = "ConsumerProducts.CoffeeMaker.Program.Beverage.Espresso"
+options = [{ key = "ConsumerProducts.CoffeeMaker.Option.FillQuantity", value = 50 }]
 # … one [[item]] per code
 ```
 
@@ -105,9 +119,16 @@ Rules (enforced by the loader, mirrored in tests):
   branding (`branding.toml`) stays separate and composes: topbar = event,
   menu = pack.
 
-**Built-in packs** (bundled in the app, work standalone/offline):
-`coffee` (the classic Qoffee 8: Espresso … Americano), `cocktails`,
-`icecream`, and `demo` (emoji food, 4 items / 2 qubits — the docs/test pack).
+**Built-in packs** (bundled in the app, work standalone/offline) — the three
+real menus migrate from quantum-mixer's usecase YAMLs, names included:
+`coffee` ("QoffeeMaker": Tea, Hot Chocolate, Espresso, Coffee, Cappuccino,
+Latte Macchiato, Viennese Melange, Americano — with their Home Connect program
+keys kept as dispatch payloads), `cocktails` ("Qocktail": Whiskey Sour →
+Water), `icecream` ("IceQream": Strawberry → Salted Peanut, with the
+delightful `111` = "Melted :(" — the house precedent for our auto-pad item),
+plus `demo` (emoji food, 4 items / 2 qubits — the docs/test pack). Their icon
+assets can be copied over (same author/family); until then the emoji
+fallbacks apply.
 
 **Custom packs**: host-side directory next to the other config files
 (`menu/<id>/pack.toml` + images), served at `/api/menu/packs` (list) and
@@ -165,10 +186,15 @@ adapters, configured per pack or in a host-level `dispatch.toml`:
   pack.
 - `webhook` — POST the `served` JSON to a configured URL. The universal
   adapter: cocktail robots, Home Assistant, GPIO bridges, ice-cream machines.
-- `homeconnect` — the Qoffee path: OAuth (device flow) against the Home
-  Connect API, item `program` = HomeConnect program key, start program on
-  serve. Needs a developer-account client id; the Home Connect simulator
-  works for CI-less manual testing.
+- `homeconnect` — the Qoffee path, mirroring quantum-mixer's working
+  implementation: OAuth against the Home Connect API (login → callback →
+  token), machine selection from the live appliance list (quantum-mixer
+  exposes `selectedMachineHaId` as a schema-driven enum — our `/debug`
+  dispatch card does the same), serve → `PUT
+  /api/homeappliances/{haId}/programs/active` with the item's `program.key` +
+  `options` (values coerced to int where the API demands it), and machine
+  power-on ensured when dispatch is armed. Needs a developer-account client
+  id; the Home Connect simulator works for CI-less manual testing.
 
 Safety rails: dispatch is **disarmed by default**, armed from `/debug`
 (operator token), auto-disarms after a configurable idle period; per-serve
@@ -217,23 +243,57 @@ dispatch logged.
 - Manual: iPhone standalone (`?menu=icecream`), booth kiosk + viewer phones
   see the same reveal, dispatch dry-run log.
 
+## Parity audit — what the old repos actually contain (read 2026-07-19)
+
+**quantum-mixer** (`JanLahmann/quantum-mixer`; Angular 15 + FastAPI/Poetry,
+Docker incl. arm64) is the generalized successor of Qoffee-Maker and the
+direct ancestor of this design:
+
+- **Usecases ≙ menu packs.** YAML per scenario in
+  `quantum_mixer_backend/usecases/`: `id`, `name`, `description`,
+  `bitMapping: [{bits, name, icon, key?, options?}]`, `numQubits`,
+  `numMeasurements {min,max,default}`, `loginRequired`, `hasOrder`,
+  `externalLinks`. Shipped: `Qocktail`, `IceQream`, `QoffeeMaker` (the coffee
+  items carry Home Connect program keys + options, e.g. `FillQuantity: 50`).
+  Icons under the backend's `public/` assets. → Adopted: schema fields
+  (`shots {min,max,default}`, `[[link]]`, structured `program`), the three
+  menus as built-in packs.
+- **Multi-measurement was anticipated**: `numMeasurements` is a bounded,
+  visitor-facing range (all shipped packs pin 1). → Our `shots` mode is its
+  generalization; `subset` mode is new here.
+- **Per-usecase preferences with JSON-schema-driven UI** (`/preferences`,
+  `/preferences/schema`; machine picker enum built from the live Home Connect
+  appliance list). → Folded into the MX4 `/debug` dispatch card.
+- **Ordering** (`hasOrder`/`loginRequired`): OAuth login → callback → token,
+  auto-select first coffee machine, `POST /order` → start program with
+  key+options, machine power-on on preference save. → MX4 `homeconnect`
+  adapter, host-side.
+- **Execution**: `CircuitExecutor` with statevector (analytical), qasm
+  simulator (800 shots), and FakeMontreal mock. → Entangible already exceeds
+  this (exact density-matrix noise, four chip-generation presets, zero
+  backend).
+- **Custom Angular circuit composer** (catalogue / operation-details / drag
+  UI). → Superseded by qamposer + tiles + `ManualEditSource`; nothing to port.
+- Not present in either repo: sounds, leaderboards, or anything else outside
+  menu/serve/order — no hidden features to chase.
+
+**Qoffee-Maker** (`JanLahmann/Qoffee-Maker`; Dockerized Jupyter, `qoffee.ipynb`
+in App Mode, env-var config incl. `IBMQ_API_KEY`): fully subsumed by the
+quantum-mixer findings above; MX4 closes it out.
+
 ## Open questions (for Jan, before/during MX1)
 
-1. **quantum-mixer feature audit** — this plan is grounded in the Qoffee
-   concept and Entangible's architecture; the quantum-mixer repo couldn't be
-   read from this session (repo access needs an interactive approval). Add
-   both repos to a session (or point me at them) for a quick parity pass —
-   anything beyond menu/serve/branding there (sound? multi-shot modes?
-   leaderboards?) gets folded into MX1/MX3.
-2. **Serve authority in the booth** — plan says: the surface that simulates
+1. **Serve authority in the booth** — plan says: the surface that simulates
    samples, the host stamps + broadcasts. OK, or should the kiosk be the only
    sampler?
-3. **Big-menu ambition** — cap at 32 items (5 qubits) is the board's natural
-   limit; fine?
-4. **Home Connect** — is the original Qoffee developer account / machine still
+2. **Big-menu ambition** — cap at 32 items (5 qubits) is the board's natural
+   limit; fine? (quantum-mixer never went past 3 qubits.)
+3. **Home Connect** — is the original Qoffee developer account / machine still
    available for MX4 testing, or should webhook be the only v1 adapter?
-5. **Naming** — mode key `mixer`, feature name "Quantum Mixer", packs =
-   "menu packs". Blessing or better ideas?
-6. **Shots count** — fixed per pack (`shots = 3`) as planned, or
-   visitor-choosable at serve time ("how many scoops?"), which adds a UI
-   step but is friendlier at an ice-cream booth?
+4. **Naming** — mode key `mixer`, feature name "Quantum Mixer", packs =
+   "menu packs"; built-ins keep the usecase names (Qocktail, IceQream,
+   QoffeeMaker). Blessing or better ideas?
+5. **Real-backend serve** — quantum-mixer's `IBMQ_API_KEY` path hints at
+   running the shot on real hardware. Entangible's optional qiskit backend
+   could serve from a real QPU run (queue times permitting) — worth a
+   stretch line in MX4, or out of scope?

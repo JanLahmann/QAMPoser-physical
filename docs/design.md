@@ -399,9 +399,16 @@ Start with mixer (display-only serving); machine control follows.
   cooldowns; secrets never in the browser.
 - Phases MX0 (menu core) → MX1 (standalone mixer = quantum-mixer replaced) →
   MX2 (booth mode) → MX3 (custom packs) → MX4 (dispatch = Qoffee replaced) →
-  MX5 (sunset old repos, upstream track). Open questions incl. a
-  quantum-mixer feature-parity audit (repo not readable from the planning
-  session) are listed in mixer.md.
+  MX5 (sunset old repos, upstream track).
+- **Parity audit done (2026-07-19, both repos read):** quantum-mixer's YAML
+  *usecases* (Qocktail / IceQream / QoffeeMaker) are proto-menu-packs — their
+  schema shapes (`numMeasurements {min,max,default}` → visitor-bounded shots,
+  `externalLinks`, Home Connect `key`+`options` per item) and the three menus
+  themselves are adopted; its schema-driven preferences UI informs the MX4
+  dispatch card; its custom Angular composer and 3-simulator backend are
+  superseded by qamposer/tiles and the in-browser noise model. No hidden
+  features (no sound/leaderboards). Details + remaining open questions in
+  mixer.md.
 
 ### Quantum Golf — DECIDED (per Jan 2026-07-19, build today)
 
