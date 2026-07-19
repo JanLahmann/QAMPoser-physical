@@ -32,14 +32,29 @@ one more entry in the existing mode system, exactly like `golf`.
 - A **menu pack** (config package) defines a scenario: coffee, ice cream,
   cocktails, juice, anything — its items, pictures, branding, and (optionally)
   machine programs. Packs are data, not code; events/users make their own.
-- The pack's item count fixes the qubit count: ⌈log₂ N⌉ (≤ 5 — the board has 5
-  rows; 32 items max). The menu view shows every item with its binary code and
-  its **live probability** derived from the same probability vector the
-  histogram shows (ideal, or noisy when a noise preset is active).
-- **Serve**: one shot is sampled from the active distribution. Reveal animation
-  → order card ("You ordered: Cappuccino — `100` at 87%"). With a noise preset
-  on, the shot is sampled from the *noisy* distribution — "real hardware might
-  make you an espresso instead" is the best teaching moment in the family.
+- A pack declares one of three **serve modes** (per Jan 2026-07-19 — a serve
+  may pick multiple things, e.g. several ice-cream scoops or a cocktail's
+  ingredients):
+  - **`single`** (the Qoffee classic): item count fixes the qubit count
+    ⌈log₂ N⌉ (≤ 5 — the board has 5 rows; 32 items max); one shot = one item.
+  - **`shots`**: same encoding, but a serve draws `shots = k` independent
+    shots — k scoops, duplicates welcome ("2× vanilla, 1× mango" from a
+    lopsided distribution is the honest outcome).
+  - **`subset`**: each item is bound to ONE qubit (≤ 5 items); a single shot's
+    bitstring selects the subset — set bits are the ingredients in the glass.
+    Superposition = "maybe"-ingredients; **entanglement = ingredients that
+    always (or never) arrive together** — a Bell pair on gin+tonic is the
+    best entanglement demo in the family.
+- The menu view shows every item with its binary code and its **live
+  probability** derived from the same probability vector the histogram shows
+  (ideal, or noisy when a noise preset is active). In `subset` mode the
+  per-item number is the qubit's *marginal* P(bit=1); `shots` mode shows the
+  expected share of scoops.
+- **Serve**: sample the active distribution (once, or k times). Reveal
+  animation → order card ("You ordered: Cappuccino — `100` at 87%" / a scoop
+  list / an ingredient list). With a noise preset on, shots are sampled from
+  the *noisy* distribution — "real hardware might make you an espresso
+  instead" is the best teaching moment in the family.
 - Dispatch (later): the host can forward a serve to a real machine (Home
   Connect coffee machine, webhook for anything else) — operator-armed only.
 
@@ -55,13 +70,17 @@ id      = "cocktails"
 title   = "Quantum Bar"
 tagline = "Mix your drink with a quantum computer"
 
+[serve]                      # optional; default mode = "single"
+mode  = "single"             # "single" | "shots" | "subset"
+shots = 3                    # only for mode = "shots" (1–10)
+
 [theme]                      # optional branding overrides (CSS vars on tokens.css)
 accent     = "#e91e63"
 background = "bar.jpg"       # relative to the pack dir
 logo       = "logo.svg"
 
 [[item]]
-code     = "000"
+code     = "000"             # single/shots modes; subset mode uses `qubit = 0` instead
 name     = "Tropical Sunrise"
 subtitle = "orange · mango · grenadine"
 image    = "sunrise.jpg"     # relative path; emoji used when absent
@@ -71,9 +90,11 @@ program  = ""                # optional dispatch payload (MX4)
 ```
 
 Rules (enforced by the loader, mirrored in tests):
-- `2 ≤ items ≤ 32`; qubit count = ⌈log₂ N⌉; codes are unique bitstrings of that
-  width, using the same bit-order convention as the shared histogram labels
-  (single source: `shared/display/outcomes.ts` — no second convention).
+- `single`/`shots`: `2 ≤ items ≤ 32`; qubit count = ⌈log₂ N⌉; codes are unique
+  bitstrings of that width, using the same bit-order convention as the shared
+  histogram labels (single source: `shared/display/outcomes.ts` — no second
+  convention). `subset`: `2 ≤ items ≤ 5`, each item names a unique `qubit`
+  0–4; qubit count = item count.
 - Packs SHOULD fill all 2^q codes; unfilled codes are auto-padded with a
   "Surprise me ✨" house item (an honest answer to leftover amplitude — never
   re-roll, never remap: the measurement is the measurement).
@@ -101,8 +122,10 @@ Follows the noise-model / golf playbook: shared math + classPrefix components,
 a mode, a layout field, an operator `select_*`, host validation + persistence.
 
 - **`shared/menu/`** — `pack.ts` (types, validation, code↔item mapping,
-  padding), `sample.ts` (`sampleOutcome(probs, rng)`; injectable RNG —
-  seeded mulberry32 in tests, crypto random in the UI), `builtinPacks.ts`,
+  padding, serve modes), `sample.ts` (`sampleOutcome(probs, rng)` +
+  `sampleShots(probs, k, rng)` + `marginals(probs)` for subset mode;
+  injectable RNG — seeded mulberry32 in tests, crypto random in the UI),
+  `builtinPacks.ts`,
   `MenuGrid.tsx` + `OrderCard.tsx` + `ServeReveal.tsx` (classPrefix-shared,
   themed via CSS vars).
 - **Pocket (standalone)** — a Mixer surface like Golf's: pack picker in the
@@ -119,13 +142,15 @@ a mode, a layout field, an operator `select_*`, host validation + persistence.
   - `layout` gains `menu: string | null` (active pack id).
   - client `select_menu {pack}` — operator-only, validated + persisted +
     replayed like `select_noise`.
-  - client `serve {code}` — sent by the serving surface (kiosk touch or
+  - client `serve {outcomes}` — sent by the serving surface (kiosk touch or
     `/debug`), operator-standing required; the sampler runs where the
     simulation runs (the client), the host is the authority that stamps and
-    fans out.
-  - server `served {seq, packId, code, probability, shotSource: 'ideal'|'noisy'}`
-    — broadcast to all clients (viewers' phones show the same reveal, in sync),
-    latest replayed to late joiners.
+    fans out. `outcomes` is a bitstring list: length 1 for `single`/`subset`,
+    length k for `shots`.
+  - server `served {seq, packId, outcomes, shotSource: 'ideal'|'noisy'}` —
+    broadcast to all clients (viewers' phones show the same reveal, in sync),
+    latest replayed to late joiners; clients resolve outcomes → items/scoop
+    counts/ingredient subset via the shared pack mapping.
   - The existing policy test extends: `select_menu`/`serve` send-sites pinned
     to operator surfaces.
 - **Host** — `layout.py` grows the `menu` field + `select_menu`; a new
@@ -178,10 +203,11 @@ dispatch logged.
 
 ## Verification
 
-- Unit: pack validation matrix (counts, dup codes, width, padding), sampler
-  statistics under a seeded RNG (χ² sanity vs the input distribution), menu
-  probabilities byte-identical to the histogram's vector, theme CSS-var
-  application.
+- Unit: pack validation matrix (counts, dup codes/qubits, width, padding,
+  serve-mode rules), sampler statistics under a seeded RNG (χ² sanity vs the
+  input distribution; multi-shot draws), marginal math vs closed-form cases
+  (Bell → both ingredients perfectly correlated), menu probabilities
+  byte-identical to the histogram's vector, theme CSS-var application.
 - Protocol: `messages.test.ts` parity vs `docs/protocol.md` (new messages);
   static policy test for the new `select_menu`/`serve` send-sites; host tests
   for validation/persistence/replay of `menu` + `served`.
@@ -208,3 +234,6 @@ dispatch logged.
    available for MX4 testing, or should webhook be the only v1 adapter?
 5. **Naming** — mode key `mixer`, feature name "Quantum Mixer", packs =
    "menu packs". Blessing or better ideas?
+6. **Shots count** — fixed per pack (`shots = 3`) as planned, or
+   visitor-choosable at serve time ("how many scoops?"), which adds a UI
+   step but is friendlier at an ice-cream booth?

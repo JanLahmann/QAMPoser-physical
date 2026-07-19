@@ -380,10 +380,16 @@ Start with mixer (display-only serving); machine control follows.
   `?menupack=<url>`. N items ↔ ⌈log₂ N⌉ qubits (≤ 32 items); unfilled codes
   auto-pad as "Surprise me" (never remapped — the measurement is the
   measurement).
+- **Serve modes** (per pack): `single` (Qoffee classic — one shot, one item),
+  `shots` (k independent shots — multiple ice-cream scoops, duplicates
+  welcome), `subset` (one item per qubit, ≤ 5; a single shot's set bits are
+  the cocktail's ingredients — entanglement = ingredients that always/never
+  arrive together).
 - **Serve**: menu view shows per-item live probabilities from the same vector
-  as the histogram (ideal, or noisy when a noise preset is active); one
-  sampled shot picks the item, reveal + order card; noisy shots are the
-  teaching moment ("real hardware might make you an espresso instead").
+  as the histogram (ideal, or noisy when a noise preset is active; marginals
+  in `subset` mode); sampled shot(s) pick the result, reveal + order card;
+  noisy shots are the teaching moment ("real hardware might make you an
+  espresso instead").
 - **Booth**: mode `mixer` (panels `menu`/`order`/`results`), additive
   protocol: `layout.menu`, operator `select_menu` + `serve`, broadcast
   `served` (viewer phones reveal in sync). Same validation/persistence/
