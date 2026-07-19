@@ -20,12 +20,15 @@ Derivation (see docs/design.md "In-browser noise model"):
         gammaPhi = 1 - exp(-t / Tphi),  with 1/Tphi = max(0, 1/T2 - 1/(2*T1))
   - readout = measure-instruction error (symmetric flip probability).
 
-Presets:
-  - `today` (FakeAachen, 156q Heron): device-wide medians, uniform scalars.
+Presets — one per IBM chip generation, oldest to newest (the "hardware is
+improving" story arc, told with real calibration snapshots):
+  - `falcon` (FakeManilaV2, 5q Falcon, 2021): per-qubit ARRAYS (length 5,
+    qubit i -> wire i) for gamma1/gammaPhi/readout; median scalars for p1/p2.
+  - `eagle` (FakeBrussels, 127q Eagle): device-wide medians, uniform scalars.
+    Eagle's two-qubit gate is `ecr`.
+  - `heron` (FakeAachen, 156q Heron): device-wide medians, uniform scalars.
   - `nighthawk` (FakeBerlin, 120q Nighthawk): device-wide medians, uniform
-    scalars — IBM's newest chip generation as a third point on the arc.
-  - `early` (FakeManilaV2, 5q Falcon-era): per-qubit ARRAYS (length 5, qubit i
-    -> wire i) for gamma1/gammaPhi/readout; median scalars for p1/p2.
+    scalars — IBM's newest chip generation.
 
 Output is deterministic: keys sorted, floats rounded to 6 significant digits.
 """
@@ -37,7 +40,12 @@ import math
 from pathlib import Path
 from statistics import median
 
-from qiskit_ibm_runtime.fake_provider import FakeAachen, FakeBerlin, FakeManilaV2
+from qiskit_ibm_runtime.fake_provider import (
+    FakeAachen,
+    FakeBerlin,
+    FakeBrussels,
+    FakeManilaV2,
+)
 
 OUT = Path(__file__).resolve().parent.parent / "shared" / "quantum" / "noisePresets.json"
 REGEN_CMD = "uv run --no-project tools/extract_noise_presets.py"
@@ -94,7 +102,8 @@ def relaxation(t_ns: float, t1_s: float, t2_s: float) -> tuple[float, float]:
 def summarize(target, num_qubits):
     """Collect the raw device statistics needed by both preset flavours."""
     p1_samples = gate_errors(target, "sx") + gate_errors(target, "x")
-    two_q = "cz" if "cz" in target.operation_names else "cx"
+    # cz on Heron/Nighthawk, ecr on Eagle, cx on Falcon-era devices.
+    two_q = next(g for g in ("cz", "ecr", "cx") if g in target.operation_names)
     p2_samples = gate_errors(target, two_q)
     dur_samples = gate_durations_ns(target, two_q)
     t1 = [target.qubit_properties[q].t1 for q in range(num_qubits)]
@@ -111,7 +120,7 @@ def summarize(target, num_qubits):
     }
 
 
-def build_today(backend) -> dict:
+def build_uniform(backend) -> dict:
     target = backend.target
     n = backend.num_qubits
     s = summarize(target, n)
@@ -138,7 +147,7 @@ def build_today(backend) -> dict:
     }
 
 
-def build_early(backend, wires: int = 5) -> dict:
+def build_per_qubit(backend, wires: int = 5) -> dict:
     target = backend.target
     n = backend.num_qubits
     s = summarize(target, n)
@@ -181,9 +190,10 @@ def main() -> None:
         ),
         "regenerate": REGEN_CMD,
         "wires": 5,
-        "today": build_today(FakeAachen()),
-        "nighthawk": build_today(FakeBerlin()),
-        "early": build_early(FakeManilaV2()),
+        "falcon": build_per_qubit(FakeManilaV2()),
+        "eagle": build_uniform(FakeBrussels()),
+        "heron": build_uniform(FakeAachen()),
+        "nighthawk": build_uniform(FakeBerlin()),
     }
     OUT.write_text(json.dumps(presets, indent=2, sort_keys=True) + "\n")
     print(f"wrote {OUT}")

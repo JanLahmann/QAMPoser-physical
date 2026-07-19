@@ -101,9 +101,10 @@ describe('noise — invariants', () => {
   ];
   const paramSets: Record<string, NoiseParams> = {
     moderate: { p1: 0.02, p2: 0.04, gamma1: 0.03, gammaPhi: 0.03, readout: 0.03 },
-    today: resolvePreset('today'),
+    falcon: resolvePreset('falcon'),
+    eagle: resolvePreset('eagle'),
+    heron: resolvePreset('heron'),
     nighthawk: resolvePreset('nighthawk'),
-    early: resolvePreset('early'),
   };
   for (const [pname, params] of Object.entries(paramSets)) {
     circuits.forEach((c, ci) => {
@@ -127,24 +128,18 @@ describe('noise — preset resolution', () => {
     expect(resolvePreset('off')).toEqual(ZERO);
   });
 
-  it("'today' loads uniform finite scalars in (0,1)", () => {
-    const p = resolvePreset('today');
-    for (const v of [p.p1, p.p2, p.gamma1, p.gammaPhi, p.readout]) {
-      expect(typeof v).toBe('number');
-      expect(finiteUnit(v as number)).toBe(true);
-    }
-  });
+  for (const name of ['eagle', 'heron', 'nighthawk'] as const) {
+    it(`'${name}' loads uniform finite scalars in (0,1)`, () => {
+      const p = resolvePreset(name);
+      for (const v of [p.p1, p.p2, p.gamma1, p.gammaPhi, p.readout]) {
+        expect(typeof v).toBe('number');
+        expect(finiteUnit(v as number)).toBe(true);
+      }
+    });
+  }
 
-  it("'nighthawk' loads uniform finite scalars in (0,1)", () => {
-    const p = resolvePreset('nighthawk');
-    for (const v of [p.p1, p.p2, p.gamma1, p.gammaPhi, p.readout]) {
-      expect(typeof v).toBe('number');
-      expect(finiteUnit(v as number)).toBe(true);
-    }
-  });
-
-  it("'early' loads length-5 per-qubit arrays in (0,1)", () => {
-    const p = resolvePreset('early');
+  it("'falcon' loads length-5 per-qubit arrays in (0,1)", () => {
+    const p = resolvePreset('falcon');
     expect(typeof p.p1).toBe('number');
     expect(typeof p.p2).toBe('number');
     for (const arr of [p.gamma1, p.gammaPhi, p.readout]) {

@@ -64,7 +64,7 @@
       ]
     },
     {
-      "name": "ghz5_today",
+      "name": "ghz5_heron",
       "circuit": {
         "qubits": 5,
         "gates": [
@@ -345,7 +345,7 @@
       ]
     },
     {
-      "name": "spread_early",
+      "name": "spread_falcon",
       "circuit": {
         "qubits": 5,
         "gates": [

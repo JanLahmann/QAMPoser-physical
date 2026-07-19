@@ -55,7 +55,8 @@ export interface NoiseParams {
   readonly readout: number | readonly number[];
 }
 
-export type NoisePreset = 'off' | 'today' | 'nighthawk' | 'early';
+/** One preset per IBM chip generation, oldest to newest (plus 'off'). */
+export type NoisePreset = 'off' | 'falcon' | 'eagle' | 'heron' | 'nighthawk';
 
 const OFF: NoiseParams = { p1: 0, p2: 0, gamma1: 0, gammaPhi: 0, readout: 0 };
 

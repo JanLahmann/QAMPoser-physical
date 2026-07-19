@@ -295,21 +295,26 @@ can be *sourced from real devices*, not invented.
 2026-07-19).** The defaults above were hand-picked round numbers; instead,
 extract them from `qiskit_ibm_runtime.fake_provider` calibration snapshots
 (T1/T2, per-gate error + duration, per-qubit asymmetric readout error):
-- `Ideal` — noise off.
-- `Today's hardware` — **FakeAachen** (156-qubit Heron snapshot): median
-  1q/2q gate error → p1/p2; median T1/T2 + a moment duration set to the
-  median 2q-gate duration → per-moment γ₁/γ_φ; median readout confusion.
-- `Nighthawk` — **FakeBerlin** (120-qubit Nighthawk snapshot, added per Jan
-  2026-07-19): same median extraction. IBM's newest chip generation as a
-  third point on the arc — better T1 than Heron but early-calibration CZ
-  and readout, an honest "new architectures start behind mature ones" datum.
-- `Early device` — a Falcon-era **5-qubit** fake (FakeManilaV2 or
-  FakeLimaV2): its 5 qubits map 1:1 onto our 5 wires, so this preset gets
-  *per-qubit* T1/T2/readout for free and is a genuinely real 2021-era
-  device — better story than an artificial "10× worse".
+As built (per Jan 2026-07-19): **one preset per IBM chip generation**,
+oldest to newest — keys `off | falcon | eagle | heron | nighthawk`:
+- `falcon` — **FakeManilaV2** (5-qubit Falcon, 2021): its 5 qubits map 1:1
+  onto our 5 wires, so this preset gets *per-qubit* T1/T2/readout for free
+  and is a genuinely real early device — better story than an artificial
+  "10× worse".
+- `eagle` — **FakeBrussels** (127-qubit Eagle): device-wide medians; note
+  Eagle's 2-qubit gate is `ecr` (slow, ~660 ns moment → heavier per-moment
+  decay).
+- `heron` — **FakeAachen** (156-qubit Heron): median 1q/2q gate error →
+  p1/p2; median T1/T2 + a moment duration set to the median 2q-gate
+  duration → per-moment γ₁/γ_φ; median readout confusion. Today's workhorse
+  and the cleanest preset.
+- `nighthawk` — **FakeBerlin** (120-qubit Nighthawk): same median
+  extraction. IBM's newest chip generation — better T1 than Heron but
+  early-calibration CZ and readout, an honest "new architectures start
+  behind mature ones" datum.
 
-The story arc "hardware is improving" is now literal (2021 device vs 2026
-device). Sanity-check against the fixtures below that Bell stays visibly
+The story arc "hardware is improving" is now literal, told in four real
+chip generations. Sanity-check against the fixtures below that Bell stays visibly
 degraded-but-Bell and GHZ-5 shows recognizable-but-eroded peaks; if a
 median-based preset is too subtle on a 6-gate booth circuit, prefer
 switching the statistic (e.g. worst-quartile qubits) over inventing

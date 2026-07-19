@@ -164,9 +164,9 @@ def fixtures() -> list[dict]:
         "params": MODERATE,
     })
 
-    # GHZ-5 under the `today` preset (uniform scalars).
+    # GHZ-5 under the `heron` preset (uniform scalars).
     out.append({
-        "name": "ghz5_today",
+        "name": "ghz5_heron",
         "circuit": {"qubits": 5, "gates": [
             gate(0, type="H", qubit=0, position=0),
             gate(1, type="CNOT", control=0, target=1, position=1),
@@ -174,7 +174,7 @@ def fixtures() -> list[dict]:
             gate(3, type="CNOT", control=0, target=3, position=3),
             gate(4, type="CNOT", control=0, target=4, position=4),
         ]},
-        "params": preset_params("today"),
+        "params": preset_params("heron"),
     })
 
     # Single X on q0 with 3 idle-moment padding: q1 flips in moments 1-3 while
@@ -210,17 +210,17 @@ def fixtures() -> list[dict]:
         "params": MODERATE,
     })
 
-    # `early` per-qubit params: GHZ-3 on q0-q2 plus an X on q3 to sample the
+    # `falcon` per-qubit params: GHZ-3 on q0-q2 plus an X on q3 to sample the
     # per-qubit gamma/readout arrays across four wires.
     out.append({
-        "name": "spread_early",
+        "name": "spread_falcon",
         "circuit": {"qubits": 5, "gates": [
             gate(0, type="H", qubit=0, position=0),
             gate(1, type="X", qubit=3, position=0),
             gate(2, type="CNOT", control=0, target=1, position=1),
             gate(3, type="CNOT", control=1, target=2, position=2),
         ]},
-        "params": preset_params("early"),
+        "params": preset_params("falcon"),
     })
 
     for f in out:
