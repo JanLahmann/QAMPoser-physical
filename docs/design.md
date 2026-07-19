@@ -174,8 +174,15 @@ Consequences: features ship once for all roles; one deploy/test surface; M5
 
 ### Take it home — run on real hardware (DECIDED per Jan 2026-07-19; T1 anytime, T2 after U1)
 
-The visitor journey's final act: physically build → see it on your phone →
-run it on a real IBM quantum computer. Phases:
+**Simplified per Jan 2026-07-19: ONE "Transfer to IBM Composer" button** in
+the pocket app (visible whenever a circuit exists; also in the future viewer).
+Behavior: copy the QASM to the clipboard AND open the Composer in a new tab
+with the QASM attached as an optimistic URL param (old IQX `?initial=`
+convention — pre-fills if honored, harmless if ignored) + a toast: "QASM
+copied — paste into the Composer's code editor if it doesn't appear." A small
+Guide note covers the free-account step. Copy/Download/Share and the Qiskit
+snippet remain optional extras, not requirements. Original phase sketch kept
+below for reference:
 - **T1 QASM handoff** (standalone pocket, pre-U1 OK): "Take it home" section —
   Copy QASM / Download .qasm / Web-Share (AirDrop, mail). QASM is the
   interchange; Composer ingests .qasm uploads (documented path).
