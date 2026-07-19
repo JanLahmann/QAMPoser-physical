@@ -97,7 +97,8 @@ Every message is a JSON object with a `type` discriminator.
   "type": "layout",
   "mode": "composer",                    // "composer" | "golf" | "attract"
   "sidebar": "right",                    // "right" | "left"
-  "panels": ["results", "state", "qasm"] // visible panels, in order (registry names)
+  "panels": ["results", "state", "qasm"], // visible panels, in order (registry names)
+  "wires": "compact"                     // "compact" | "all" — displayed wire count
 }
 ```
 

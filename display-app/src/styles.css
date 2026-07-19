@@ -427,6 +427,26 @@ body {
   letter-spacing: -0.01em;
   animation: ent-attract-breathe 12s ease-in-out infinite;
 }
+/* Event co-brand: "Entangible at ⟨event⟩" (docs/booth-ux.md → branding). */
+.ent-attract__cobrand {
+  margin-top: -3vh;
+  display: flex;
+  align-items: center;
+  gap: 1.5vh;
+  font-size: 3vh;
+  color: var(--ent-text-dim, #8a91a0);
+}
+.ent-attract__cobrand-at {
+  font-style: italic;
+}
+.ent-attract__cobrand-name {
+  font-weight: 600;
+  color: var(--ent-text, #e6e9ef);
+}
+.ent-attract__cobrand img {
+  max-height: 5vh;
+  max-width: 40vh;
+}
 .ent-attract__board {
   position: relative;
   width: 60vh;

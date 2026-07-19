@@ -22,6 +22,7 @@ def test_gate_colors_match_qamposer_react():
     assert c.RY == "#9f1853"
     assert c.RZ == "#33b1ff"
     assert c.CNOT == "#002d9c"
+    assert c.SWAP == "#002d9c"  # SWAP × shares the CNOT-family colour
     assert c.for_gate("H") == "#fa4d56"
 
 

@@ -2,8 +2,8 @@ import { describe, it, expect } from 'vitest';
 import { TEST_BOARDS } from '../src/app/testBoards';
 
 describe('TEST_BOARDS', () => {
-  it('lists the nine example boards in order', () => {
-    expect(TEST_BOARDS).toHaveLength(9);
+  it('lists the ten example boards in order', () => {
+    expect(TEST_BOARDS).toHaveLength(10);
     expect(TEST_BOARDS.map((b) => b.id)).toEqual([
       '01-empty',
       '02-single-h',
@@ -14,6 +14,7 @@ describe('TEST_BOARDS', () => {
       '07-uniform-32',
       '08-lone-control',
       '09-dials',
+      '10-swap',
     ]);
   });
 
@@ -28,6 +29,7 @@ describe('TEST_BOARDS', () => {
       'H on all five qubits',
       'Lone control',
       'Dial tiles',
+      'SWAP tiles',
     ]);
   });
 

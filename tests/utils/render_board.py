@@ -32,6 +32,7 @@ from qamposer_vision.markers import ARUCO_DICT_NAME, CORNER_IDS
 #   RZ: pi/4=28 pi/2=29 pi=30 -pi/2=31
 #   S=40 (emitted as RZ(pi/2))   T=41 (emitted as RZ(pi/4))
 #   Dials: RX-dial=42 RY-dial=43 RZ-dial=44 (angle = ROTATION_ANGLES[rotation])
+#   SWAP ×=45 (two in one column → a SWAP between their rows, emitted as 3 CNOTs)
 #
 # A placement is (marker_id, row, col) or (marker_id, row, col, rotation); the
 # optional 4th element is the tile's clockwise 90° turn (0-3, default 0), used by
@@ -69,6 +70,9 @@ SCENARIOS: list[Scenario] = [
     # Dial tiles at mixed rotations: RX-dial r=1 → RX(pi/2), RY-dial r=3 →
     # RY(-pi/2), RZ-dial r=2 → RZ(pi). Emitted byte-identically to classic tiles.
     Scenario("dials", ((42, 0, 0, 1), (43, 1, 1, 3), (44, 2, 2, 2))),
+    # SWAP: H on q0, then two × tiles in column 1 (q0/q1) → a SWAP(0,1) emitted
+    # as its 3-CNOT decomposition (cx(0,1), cx(1,0), cx(0,1)).
+    Scenario("swap", ((10, 0, 0), (45, 0, 1), (45, 1, 1))),
 ]
 
 SCENARIOS_BY_NAME = {s.name: s for s in SCENARIOS}

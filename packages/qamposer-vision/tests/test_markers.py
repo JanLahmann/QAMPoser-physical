@@ -23,7 +23,7 @@ from qamposer_vision.markers import (
 )
 
 # The exact IDs the scheme documents (docs/marker-ids.md must match).
-EXPECTED_IDS = {0, 1, 2, 3, 10, 11, 12, 13, 14, 15, *range(20, 32), 40, 41, 42, 43, 44}
+EXPECTED_IDS = {0, 1, 2, 3, 10, 11, 12, 13, 14, 15, *range(20, 32), 40, 41, 42, 43, 44, 45}
 
 
 def test_no_cv2_import() -> None:
@@ -104,8 +104,25 @@ def test_rotation_angle_values() -> None:
 
 
 def test_no_id_collision_with_reserved_range() -> None:
-    assert RESERVED_IDS == range(45, 50)
+    assert RESERVED_IDS == range(46, 50)
     assert not (set(MARKER_TABLE) & set(RESERVED_IDS))
+
+
+def test_swap_tile() -> None:
+    # ID 45 is the SWAP × tile: a physical-tile identity (gate == "SWAP") with no
+    # native @qamposer/react type, so it carries no parameter and no emit_as (the
+    # circuit builder expands a pair of × tiles into 3 CNOTs itself).
+    spec = MARKER_TABLE[45]
+    assert spec.kind == "gate"
+    assert spec.gate == "SWAP"
+    assert spec.label == "SWAP ×"
+    assert spec.parameter is None
+    assert spec.role is None
+    assert spec.emit_as is None
+    assert spec.dial_axis is None
+    # Exactly one SWAP tile in the table.
+    swaps = {mid for mid, s in MARKER_TABLE.items() if s.gate == "SWAP"}
+    assert swaps == {45}
 
 
 def test_dial_tiles() -> None:

@@ -129,6 +129,7 @@ class Colors:
     S: str
     T: str
     CNOT: str
+    SWAP: str
     neutral: NeutralColors
 
     def for_gate(self, gate: str) -> str:
@@ -174,6 +175,7 @@ class KitConfig:
     T: int
     CNOT_control: int
     CNOT_target: int
+    swap: int
     rotations_each: int
     rx_dial: int
     ry_dial: int

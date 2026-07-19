@@ -19,11 +19,13 @@ def test_defaults_are_composer_preset():
     assert state.mode == DEFAULT_MODE == "composer"
     assert state.sidebar == "right"
     assert state.panels == ["results", "state", "qasm"]
+    assert state.wires == "compact"
     assert store.message() == {
         "type": "layout",
         "mode": "composer",
         "sidebar": "right",
         "panels": ["results", "state", "qasm"],
+        "wires": "compact",
     }
 
 
@@ -151,4 +153,50 @@ def test_api_layout_default_shape(tmp_path):
             "mode": "composer",
             "sidebar": "right",
             "panels": ["results", "state", "qasm"],
+            "wires": "compact",
         }
+
+
+# --- wires (booth-v2 display wire count) -----------------------------------
+
+
+def test_apply_layout_sets_wires_and_keeps_omitted():
+    store = LayoutStore(None)
+    store.apply_layout(wires="all")  # sidebar/panels untouched
+    assert store.state.wires == "all"
+    assert store.state.sidebar == "right"
+    assert store.state.panels == ["results", "state", "qasm"]
+
+
+def test_apply_layout_invalid_wires_ignored():
+    store = LayoutStore(None)
+    store.apply_layout(wires="triangle")
+    assert store.state.wires == "compact"
+
+
+def test_select_mode_keeps_wires():
+    store = LayoutStore(None)
+    store.apply_layout(wires="all")
+    store.select_mode("golf")  # switching mode must not reset the wire count
+    assert store.state.wires == "all"
+
+
+def test_wires_persist_roundtrip(tmp_path):
+    path = tmp_path / "layout.toml"
+    store = LayoutStore(path)
+    store.apply_layout(wires="all")
+    reloaded = LayoutStore(path)
+    assert reloaded.state.wires == "all"
+
+
+def test_ws_select_layout_wires_broadcasts(tmp_path):
+    app = _app(tmp_path)
+    with TestClient(app) as client:
+        with client.websocket_connect("/ws/state") as ws:
+            ws.receive_json()  # status
+            ws.receive_json()  # seeded layout
+            ws.send_json({"type": "select_layout", "wires": "all"})
+            layout = ws.receive_json()
+            assert layout["wires"] == "all"
+            assert layout["panels"] == ["results", "state", "qasm"]  # unchanged
+        assert client.get("/api/layout").json()["wires"] == "all"

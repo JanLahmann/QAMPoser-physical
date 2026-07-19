@@ -20,6 +20,7 @@ SCENARIO_NAMES = [
     "all_families",
     "warn_lone_control",
     "s_and_t",
+    "swap",
 ]
 
 

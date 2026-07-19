@@ -109,9 +109,11 @@ async def _handle_select_mode(websocket: WebSocket, msg: dict) -> None:
 async def _handle_select_layout(websocket: WebSocket, msg: dict) -> None:
     sidebar = msg.get("sidebar")
     panels = msg.get("panels")
+    wires = msg.get("wires")
     store = websocket.app.state.layout_store
     store.apply_layout(
         sidebar=sidebar if isinstance(sidebar, str) else None,
         panels=[str(p) for p in panels] if isinstance(panels, list) else None,
+        wires=wires if isinstance(wires, str) else None,
     )
     await websocket.app.state.hub.publish_layout(store.message())

@@ -48,9 +48,9 @@ def test_dictionary_covers_every_marker_id() -> None:
 
     exported = exp.build_dictionary()["markers"]
     assert {int(k) for k in exported} == set(MARKER_TABLE)
-    # 27 live IDs (4 corners + 4 single-qubit + 2 CNOT halves + 12 rotations +
-    # S/T + 3 RX/RY/RZ dials).
-    assert len(exported) == 27
+    # 28 live IDs (4 corners + 4 single-qubit + 2 CNOT halves + 12 rotations +
+    # S/T + 3 RX/RY/RZ dials + 1 SWAP ×).
+    assert len(exported) == 28
 
 
 def test_every_marker_has_four_distinct_rotations_all_ids_unique() -> None:

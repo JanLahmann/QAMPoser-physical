@@ -30,11 +30,14 @@ __all__ = [
     "BuildWarning",
     "BuildResult",
     "build_circuit",
+    "emit_swap",
 ]
 
 #: The two CNOT marker halves.
 _CNOT_CONTROL_ID = 14
 _CNOT_TARGET_ID = 15
+#: The SWAP tile (``×``). Two in one column pair into a SWAP between their rows.
+_SWAP_ID = 45
 
 
 @dataclass(frozen=True, slots=True)
@@ -62,7 +65,7 @@ class BuildWarning:
     """A structured, machine-readable reason a tile was excluded.
 
     ``kind`` is one of ``"cell_conflict"``, ``"lone_control"``,
-    ``"lone_target"``.
+    ``"lone_target"``, ``"lone_swap"``.
     """
 
     kind: str
@@ -142,6 +145,78 @@ def _cnot_gate(control_row: int, target_row: int, col: int) -> dict[str, Any]:
         "target": target_row,
         "position": col,
     }
+
+
+def emit_swap(row_a: int, row_b: int, col: int) -> list[dict[str, Any]]:
+    """Emit a SWAP between ``row_a``/``row_b`` at column ``col``.
+
+    Until ``@qamposer/react`` gains a native SWAP gate type, a SWAP is emitted
+    as its standard 3-CNOT decomposition, **all at the same position ``col``**
+    and in this exact array order::
+
+        cx(a, b), cx(b, a), cx(a, b)
+
+    The statevector/localAdapter applies gates in array order and
+    ``circuit_to_qasm``'s stable sort by position preserves it, so the physics
+    and the 3-``cx`` QASM are exactly correct. The three ids are
+    ``swap-{a}-{col}-1/2/3`` (``a`` = the lower of the two rows), keeping React
+    element identity stable across emissions.
+
+    This is the *single* place that knows the decomposition: swapping to a native
+    ``{"type": "SWAP", "control": a, "target": b, "position": col}`` gate later is
+    a one-function edit here (mirrored in the TS ``emitSwap``).
+    """
+    prefix = f"swap-{row_a}-{col}"
+    return [
+        {"id": f"{prefix}-1", "type": "CNOT", "control": row_a, "target": row_b, "position": col},
+        {"id": f"{prefix}-2", "type": "CNOT", "control": row_b, "target": row_a, "position": col},
+        {"id": f"{prefix}-3", "type": "CNOT", "control": row_a, "target": row_b, "position": col},
+    ]
+
+
+def _pair_swaps(
+    swap_rows: list[int], col: int
+) -> tuple[list[tuple[int, int]], list[BuildWarning]]:
+    """Pair ``×`` tiles in one column into SWAPs, nearest-by-row first.
+
+    Deterministic, mirroring the CNOT pairing: repeatedly consume the globally
+    closest unpaired pair of rows (ties broken by the lower row, then the higher
+    row). Each pair is returned as ``(a, b)`` with ``a < b``. An odd tile left
+    over (a single ``×`` in the column, or the remainder of >2 tiles) becomes a
+    ``lone_swap`` warning and is excluded.
+    """
+    remaining = sorted(swap_rows)
+    pairs: list[tuple[int, int]] = []
+
+    while len(remaining) >= 2:
+        best: tuple[int, int, int] | None = None  # (dist, a_row, b_row)
+        for i, a in enumerate(remaining):
+            for b in remaining[i + 1 :]:
+                dist = b - a  # remaining is sorted, so b > a
+                key = (dist, a, b)
+                if best is None or key < best:
+                    best = key
+        assert best is not None
+        _, a_row, b_row = best
+        pairs.append((a_row, b_row))
+        remaining.remove(a_row)
+        remaining.remove(b_row)
+
+    warnings: list[BuildWarning] = []
+    for r in remaining:  # 0 or 1 leftover
+        warnings.append(
+            BuildWarning(
+                kind="lone_swap",
+                message=(
+                    f"SWAP tile at row {r}, column {col} has no partner in its "
+                    "column; excluded."
+                ),
+                row=r,
+                col=col,
+                marker_ids=(_SWAP_ID,),
+            )
+        )
+    return pairs, warnings
 
 
 def _pair_cnots(
@@ -238,10 +313,11 @@ def build_circuit(
             continue
         kept.append(cell_tiles[0])
 
-    # 2. Split kept tiles into single-qubit gates and CNOT halves per column.
+    # 2. Split kept tiles into single-qubit gates, CNOT halves and SWAP tiles.
     gates: list[dict[str, Any]] = []
     controls_by_col: dict[int, list[int]] = {}
     targets_by_col: dict[int, list[int]] = {}
+    swaps_by_col: dict[int, list[int]] = {}
 
     for placement in kept:
         spec = placement.spec
@@ -250,6 +326,8 @@ def build_circuit(
                 controls_by_col.setdefault(placement.col, []).append(placement.row)
             else:  # target
                 targets_by_col.setdefault(placement.col, []).append(placement.row)
+        elif spec.gate == "SWAP":
+            swaps_by_col.setdefault(placement.col, []).append(placement.row)
         else:
             gates.append(
                 _single_qubit_gate(
@@ -266,8 +344,23 @@ def build_circuit(
         for control_row, target_row in pairs:
             gates.append(_cnot_gate(control_row, target_row, col))
 
-    # 4. Deterministic gate ordering: by column, then by primary row.
+    # 3b. Pair SWAP (×) tiles per column and emit each as its 3-CNOT form.
+    for col in sorted(swaps_by_col):
+        swap_pairs, col_warnings = _pair_swaps(swaps_by_col[col], col)
+        warnings.extend(col_warnings)
+        for row_a, row_b in swap_pairs:
+            gates.extend(emit_swap(row_a, row_b, col))
+
+    # 4. Deterministic gate ordering: by column, then by primary row, then type.
     def sort_key(gate: dict[str, Any]) -> tuple[int, int, str]:
+        gate_id = gate["id"]
+        if gate_id.startswith("swap-"):
+            # A SWAP's three CNOTs must keep their emission order
+            # (cx(a,b), cx(b,a), cx(a,b)); anchor all three at the SWAP's lower
+            # row ``a`` (id = "swap-{a}-{col}-{n}") so this stable sort leaves
+            # them in place — using the control row would reorder them.
+            _, a_str, _col_str, _n = gate_id.split("-")
+            return (gate["position"], int(a_str), "CNOT")
         primary_row = gate.get("qubit", gate.get("control", 0))
         return (gate["position"], int(primary_row), str(gate["type"]))
 

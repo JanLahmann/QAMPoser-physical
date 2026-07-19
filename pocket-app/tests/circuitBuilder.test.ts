@@ -45,6 +45,11 @@ const SCENARIOS: Record<string, Array<[number, number, number]>> = {
     [40, 0, 1],
     [41, 0, 2],
   ],
+  swap: [
+    [10, 0, 0],
+    [45, 0, 1],
+    [45, 1, 1],
+  ],
 };
 
 // The `dials` fixture: dial tiles at mixed rotations (markerId, row, col,
@@ -111,5 +116,31 @@ describe('buildCircuit golden fixtures (byte-identical to the Python builder)', 
     const dial = buildCircuit([{ markerId: 42, row: 0, col: 0, rotation: 1 }], QUBITS);
     const classic = buildCircuit([{ markerId: 21, row: 0, col: 0 }], QUBITS);
     expect(dial.circuit).toEqual(classic.circuit);
+  });
+
+  it('two × tiles in a column emit a 3-CNOT SWAP in order (matches the golden)', () => {
+    const swap: TilePlacement[] = SCENARIOS.swap.map(([markerId, row, col]) => ({
+      markerId,
+      row,
+      col,
+    }));
+    const result = buildCircuit(swap, QUBITS);
+    expect(result.circuit).toEqual(golden('swap'));
+    expect(result.warnings).toEqual([]);
+    // Order is fixed regardless of tile input order.
+    const reversed = buildCircuit([...swap].reverse(), QUBITS);
+    expect(reversed.circuit).toEqual(result.circuit);
+    const ids = result.circuit.gates.filter((g) => g.id.startsWith('swap-')).map((g) => g.id);
+    expect(ids).toEqual(['swap-0-1-1', 'swap-0-1-2', 'swap-0-1-3']);
+    const ctrls = result.circuit.gates.filter((g) => g.id.startsWith('swap-')).map((g) => g.control);
+    expect(ctrls).toEqual([0, 1, 0]); // cx(a,b), cx(b,a), cx(a,b)
+  });
+
+  it('a single × tile warns lone_swap and emits nothing', () => {
+    const result = buildCircuit([{ markerId: 45, row: 2, col: 1 }], QUBITS);
+    expect(result.circuit.gates).toEqual([]);
+    expect(result.warnings).toHaveLength(1);
+    expect(result.warnings[0].kind).toBe('lone_swap');
+    expect(result.warnings[0].marker_ids).toEqual([45]);
   });
 });

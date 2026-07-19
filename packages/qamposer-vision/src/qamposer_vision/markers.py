@@ -19,7 +19,10 @@ Marker scheme (``DICT_4X4_50``):
 * 42/43/44 RX/RY/RZ **dial** tiles — one tile per axis whose board-frame
   rotation selects the angle (:attr:`GateSpec.dial_axis`); see
   ``docs/design.md`` "Dial tiles"
-* 45–49 reserved for future tiles (SWAP, …), see :data:`RESERVED_IDS`
+* 45    SWAP tile ``×`` — two ``×`` tiles in one column pair into a SWAP between
+  their rows; emitted as the 3-CNOT decomposition until ``@qamposer/react`` gains
+  a native SWAP type (see ``circuit_builder.emit_swap``)
+* 46–49 reserved for future tiles, see :data:`RESERVED_IDS`
 """
 
 from __future__ import annotations
@@ -59,11 +62,13 @@ CORNER_ROLES: tuple[str, str, str, str] = ("TL", "TR", "BR", "BL")
 CORNER_IDS: dict[int, str] = {0: "TL", 1: "TR", 2: "BR", 3: "BL"}
 
 #: Valid tile gate types. ``H``/``X``/``Y``/``Z``/``RX``/``RY``/``RZ``/``CNOT``
-#: match ``@qamposer/react``'s ``GateType``; ``S``/``T`` are physical-tile
-#: identities that carry an :attr:`GateSpec.emit_as` mapping and are emitted as
-#: their RZ equivalents until ``@qamposer/react`` gains native S/T gate types.
+#: match ``@qamposer/react``'s ``GateType``; ``S``/``T``/``SWAP`` are physical-tile
+#: identities with no native ``@qamposer/react`` type yet. S/T carry an
+#: :attr:`GateSpec.emit_as` mapping (emitted as their RZ equivalents); a SWAP
+#: pair is emitted by the circuit builder as its 3-CNOT decomposition (see
+#: ``circuit_builder.emit_swap``) until ``@qamposer/react`` gains those types.
 GATE_TYPES: frozenset[str] = frozenset(
-    {"H", "X", "Y", "Z", "RX", "RY", "RZ", "CNOT", "S", "T"}
+    {"H", "X", "Y", "Z", "RX", "RY", "RZ", "CNOT", "S", "T", "SWAP"}
 )
 
 #: Rotation gate families that come in angle variants.
@@ -82,11 +87,11 @@ ROTATION_ANGLES: tuple[float, float, float, float] = (
 #: the angle ``ROTATION_ANGLES[r]``. See :attr:`GateSpec.dial_axis`.
 DIAL_IDS: dict[int, str] = {42: "RX", 43: "RY", 44: "RZ"}
 
-#: IDs reserved for future tiles (SWAP, …). IDs 40/41 are live S/T tiles and
-#: 42/43/44 are live RX/RY/RZ dial tiles; 45–49 stay reserved — never emitted by
-#: the current detector or assets generator, but claimed here so no other gate is
-#: assigned into this range.
-RESERVED_IDS = range(45, 50)
+#: IDs reserved for future tiles. IDs 40/41 are live S/T tiles, 42/43/44 are
+#: live RX/RY/RZ dial tiles and 45 is the live SWAP ``×`` tile; 46–49 stay
+#: reserved — never emitted by the current detector or assets generator, but
+#: claimed here so no other gate is assigned into this range.
+RESERVED_IDS = range(46, 50)
 
 
 def quadrant_rotation(dx: float, dy: float) -> int:
@@ -250,6 +255,12 @@ def _build_marker_table() -> dict[int, GateSpec]:
             label=f"{axis} dial",
             dial_axis=axis,
         )
+
+    # 45: SWAP tile. There is no native @qamposer/react SWAP gate type, so two
+    # SWAP tiles in one column are emitted by the circuit builder as the 3-CNOT
+    # decomposition of a SWAP between their rows (see circuit_builder.emit_swap).
+    # The physical tile carries the CNOT-family colour and an "×" glyph.
+    table[45] = GateSpec(kind="gate", gate="SWAP", label="SWAP ×")
 
     return table
 

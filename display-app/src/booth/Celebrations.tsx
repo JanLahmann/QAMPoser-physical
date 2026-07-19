@@ -28,6 +28,8 @@ const BANNER_FADE_MS = 500;
 /** A celebration request. `token` must change on every distinct fire. */
 export interface CelebrationRequest extends Celebration {
   readonly token: number;
+  /** Optional banner text override (golf hole-in: "EAGLE!/BIRDIE!/…"). */
+  readonly banner?: string;
 }
 
 interface Particle {
@@ -69,9 +71,10 @@ export function Celebrations({ celebration }: { celebration: CelebrationRequest 
     startLoop();
 
     const text =
-      celebration.kind === 'ghz'
+      celebration.banner ??
+      (celebration.kind === 'ghz'
         ? `GHZ STATE — ${celebration.k} QUBITS ENTANGLED!`
-        : 'ENTANGLEMENT!';
+        : 'ENTANGLEMENT!');
     setBanner({ text, kind: celebration.kind, token: celebration.token });
     setBannerPhase('in');
 

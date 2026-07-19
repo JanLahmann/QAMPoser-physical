@@ -5,6 +5,7 @@ description = "Printable asset generator for Entangible — vector ArUco tiles a
 requires-python = ">=3.11"
 dependencies = [
     "cairosvg",
+    "qrcode",
     "qamposer-vision",
 ]
 

@@ -41,6 +41,7 @@ current scheme plus the reserved range).
 | 42 | gate | RX | RX dial |  |  |
 | 43 | gate | RY | RY dial |  |  |
 | 44 | gate | RZ | RZ dial |  |  |
+| 45 | gate | SWAP | SWAP × |  |  |
 
 ## Dial tiles (42 / 43 / 44)
 
@@ -88,12 +89,46 @@ can share a cell — an S tile and an RZ(π/2) tile produce identical gates, whi
 is intended. When `@qamposer/react` gains native S/T types (gate table +
 matrices + `s`/`t` QASM), drop the `emit_as` mapping.
 
+## SWAP tile (45)
+
+**SWAP (ID 45)** is a single `×` tile printed in the CNOT-family colour
+(`#002d9c`) with a `SWAP ×` band caption; the `×` is drawn as a vector glyph
+(two thick, round-capped diagonals), like the CNOT `●`/`⊕` glyphs, so it never
+tofus in print. **Two `×` tiles in the same column pair into a SWAP between
+their rows** — exactly like the CNOT `●`/`⊕` pairing: nearest-unpaired,
+deterministic (ties broken by the lower row). More than two `×` in a column pair
+the nearest and warn `lone_swap` on the leftover; a single `×` warns `lone_swap`
+and is excluded.
+
+`@qamposer/react@0.2` has no native `SWAP` gate type, so the circuit builder
+emits a SWAP between rows `a` and `b` (with `a < b`) at column `c` as its
+standard **3-CNOT decomposition**, all at the same position `c` and in this exact
+array order:
+
+```
+cx(a, b), cx(b, a), cx(a, b)   # ids swap-{a}-{c}-1 / -2 / -3
+```
+
+The statevector/localAdapter applies gates in array order and `circuitToQasm`'s
+stable sort by position preserves it, so the physics and the 3-`cx` QASM are
+exactly correct. The builder anchors all three CNOTs at the lower row `a` when
+ordering gates so the triple is never reshuffled by control row. The single
+place that knows this decomposition is `circuit_builder.emit_swap` (mirrored in
+the pocket TS `emitSwap`); switching to a native `{type: "SWAP", control,
+target, position}` gate later is a one-function edit.
+
+**Known cosmetic:** because the emission is three CNOTs in one column, the
+`@qamposer/react` editor overlap-renders them in a single column. This is
+accepted for now; a native SWAP display arrives with the qamposer-react fork
+(then `emit_swap` returns one `{type: "SWAP", …}` gate and the overlap goes away).
+
 ## Reserved
 
-IDs **45–49** (`RESERVED_IDS = range(45, 50)`) are reserved for future tiles
-(SWAP, …). They are never emitted by the current detector or assets generator,
-and no current gate is assigned into this range. (IDs 40/41 are now live S/T
-tiles and 42/43/44 are live RX/RY/RZ dial tiles — see above.)
+IDs **46–49** (`RESERVED_IDS = range(46, 50)`) are reserved for future tiles.
+They are never emitted by the current detector or assets generator, and no
+current gate is assigned into this range. (IDs 40/41 are live S/T tiles,
+42/43/44 are live RX/RY/RZ dial tiles and 45 is the live SWAP × tile — see
+above.)
 
 ## Notes
 

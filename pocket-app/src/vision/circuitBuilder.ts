@@ -10,6 +10,8 @@ import { MARKER_TABLE, ROTATION_ANGLES, type GateSpec } from './markers';
 
 const CNOT_CONTROL_ID = 14;
 const CNOT_TARGET_ID = 15;
+// The SWAP tile (×). Two in one column pair into a SWAP between their rows.
+const SWAP_ID = 45;
 
 export interface TilePlacement {
   readonly markerId: number;
@@ -24,7 +26,12 @@ export interface TilePlacement {
 }
 
 // 'off_grid' is emitted by the pipeline (not the builder) but shares the shape.
-export type WarningKind = 'cell_conflict' | 'lone_control' | 'lone_target' | 'off_grid';
+export type WarningKind =
+  | 'cell_conflict'
+  | 'lone_control'
+  | 'lone_target'
+  | 'lone_swap'
+  | 'off_grid';
 
 export interface BuildWarning {
   readonly kind: WarningKind;
@@ -115,6 +122,60 @@ function cnotGate(controlRow: number, targetRow: number, col: number): CircuitGa
   };
 }
 
+/**
+ * Emit a SWAP between `rowA`/`rowB` at column `col`. EXACT port of Python
+ * `emit_swap`: until @qamposer/react gains a native SWAP type, a SWAP is its
+ * 3-CNOT decomposition, all at position `col`, in array order
+ * `cx(a,b), cx(b,a), cx(a,b)` with ids `swap-{a}-{col}-1/2/3` (a = lower row).
+ * The single place that knows the decomposition — switching to a native
+ * `{ type: 'SWAP', ... }` gate later is a one-function edit here.
+ */
+export function emitSwap(rowA: number, rowB: number, col: number): CircuitGate[] {
+  const prefix = `swap-${rowA}-${col}`;
+  return [
+    { id: `${prefix}-1`, type: 'CNOT', control: rowA, target: rowB, position: col },
+    { id: `${prefix}-2`, type: 'CNOT', control: rowB, target: rowA, position: col },
+    { id: `${prefix}-3`, type: 'CNOT', control: rowA, target: rowB, position: col },
+  ];
+}
+
+/** Pair × tiles in one column into SWAPs, nearest-by-row first (port of `_pair_swaps`). */
+function pairSwaps(
+  swapRows: number[],
+  col: number,
+): { pairs: Array<[number, number]>; warnings: BuildWarning[] } {
+  const remaining = [...swapRows].sort((a, b) => a - b);
+  const pairs: Array<[number, number]> = [];
+
+  while (remaining.length >= 2) {
+    let best: [number, number, number] | null = null; // (dist, a, b)
+    for (let i = 0; i < remaining.length; i++) {
+      for (let j = i + 1; j < remaining.length; j++) {
+        const a = remaining[i];
+        const b = remaining[j];
+        const key: [number, number, number] = [b - a, a, b]; // remaining sorted → b > a
+        if (best === null || lessThan3(key, best)) best = key;
+      }
+    }
+    const [, aRow, bRow] = best as [number, number, number];
+    pairs.push([aRow, bRow]);
+    remaining.splice(remaining.indexOf(aRow), 1);
+    remaining.splice(remaining.indexOf(bRow), 1);
+  }
+
+  const warnings: BuildWarning[] = [];
+  for (const r of remaining) {
+    warnings.push({
+      kind: 'lone_swap',
+      message: `SWAP tile at row ${r}, column ${col} has no partner in its column; excluded.`,
+      row: r,
+      col,
+      marker_ids: [SWAP_ID],
+    });
+  }
+  return { pairs, warnings };
+}
+
 /** Pair controls with targets in one column, nearest-by-row first. */
 function pairCnots(
   controlRows: number[],
@@ -163,6 +224,16 @@ function pairCnots(
   return { pairs, warnings };
 }
 
+/**
+ * The anchor row of a SWAP-decomposition CNOT (the lower row `a`, parsed from
+ * its `swap-{a}-{col}-{n}` id), or null for any other gate. Used only for the
+ * final ordering so a SWAP's three CNOTs sort as a unit and keep emission order.
+ */
+function swapAnchor(gate: CircuitGate): number | null {
+  if (!gate.id.startsWith('swap-')) return null;
+  return Number(gate.id.split('-')[1]);
+}
+
 /** Lexicographic `<` for 3-tuples (mirrors Python tuple comparison). */
 function lessThan3(a: [number, number, number], b: [number, number, number]): boolean {
   if (a[0] !== b[0]) return a[0] < b[0];
@@ -198,10 +269,11 @@ export function buildCircuit(placements: TilePlacement[], qubits: number): Build
     kept.push(cellTiles[0]);
   }
 
-  // 2. Split kept tiles into single-qubit gates and CNOT halves per column.
+  // 2. Split kept tiles into single-qubit gates, CNOT halves and SWAP tiles.
   const gates: CircuitGate[] = [];
   const controlsByCol = new Map<number, number[]>();
   const targetsByCol = new Map<number, number[]>();
+  const swapsByCol = new Map<number, number[]>();
 
   for (const p of kept) {
     const spec = specFor(p.markerId);
@@ -210,6 +282,10 @@ export function buildCircuit(placements: TilePlacement[], qubits: number): Build
       const list = map.get(p.col);
       if (list) list.push(p.row);
       else map.set(p.col, [p.row]);
+    } else if (spec.gate === 'SWAP') {
+      const list = swapsByCol.get(p.col);
+      if (list) list.push(p.row);
+      else swapsByCol.set(p.col, [p.row]);
     } else {
       gates.push(singleQubitGate(spec, p.row, p.col, p.rotation ?? 0));
     }
@@ -231,13 +307,27 @@ export function buildCircuit(placements: TilePlacement[], qubits: number): Build
     }
   }
 
+  // 3b. Pair SWAP (×) tiles per column and emit each as its 3-CNOT form.
+  for (const col of [...swapsByCol.keys()].sort((a, b) => a - b)) {
+    const { pairs, warnings: colWarnings } = pairSwaps(swapsByCol.get(col) ?? [], col);
+    warnings.push(...colWarnings);
+    for (const [rowA, rowB] of pairs) {
+      gates.push(...emitSwap(rowA, rowB, col));
+    }
+  }
+
   // 4. Deterministic gate ordering: by column, then by primary row, then type.
   gates.sort((a, b) => {
-    const ra = a.qubit ?? a.control ?? 0;
-    const rb = b.qubit ?? b.control ?? 0;
     if (a.position !== b.position) return a.position - b.position;
+    const ra = swapAnchor(a) ?? a.qubit ?? a.control ?? 0;
+    const rb = swapAnchor(b) ?? b.qubit ?? b.control ?? 0;
     if (ra !== rb) return ra - rb;
-    return a.type < b.type ? -1 : a.type > b.type ? 1 : 0;
+    // A SWAP's three CNOTs share (position, anchor, "CNOT"); a stable sort keeps
+    // their emission order (cx(a,b), cx(b,a), cx(a,b)) — the control row would
+    // reorder them, so anchor all three at the SWAP's lower row instead.
+    const ta = swapAnchor(a) !== null ? 'CNOT' : a.type;
+    const tb = swapAnchor(b) !== null ? 'CNOT' : b.type;
+    return ta < tb ? -1 : ta > tb ? 1 : 0;
   });
 
   // Deterministic warning ordering.

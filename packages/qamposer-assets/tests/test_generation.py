@@ -18,7 +18,7 @@ HAVE_PDF = available_backend() is not None
 def test_kit_tile_count_matches_assets_toml():
     k = CFG.kit
     # 12 rotation variants (RX/RY/RZ × 4 angles) × rotations_each, plus one of
-    # each RX/RY/RZ dial tile.
+    # each RX/RY/RZ dial tile and two SWAP × tiles.
     expected = (
         k.H
         + k.X
@@ -28,13 +28,14 @@ def test_kit_tile_count_matches_assets_toml():
         + k.T
         + k.CNOT_control
         + k.CNOT_target
+        + k.swap
         + 12 * k.rotations_each
         + k.rx_dial
         + k.ry_dial
         + k.rz_dial
     )
     ids = kit_tile_ids(CFG)
-    assert len(ids) == expected == 47
+    assert len(ids) == expected == 49
 
 
 def test_cli_all_end_to_end(tmp_path):
@@ -45,12 +46,12 @@ def test_cli_all_end_to_end(tmp_path):
     tiles = sorted((tmp_path / "tiles").glob(f"*.{suffix}"))
     board = sorted((tmp_path / "board").glob(f"*.{suffix}"))
 
-    # Booth kit: ceil(44 / 12) = 4 pages; sample: ceil(20 / 12) = 2 pages.
+    # Booth kit: ceil(49 / 12) = 5 pages; sample: ceil(24 / 12) = 2 pages.
     cols, rows = FORMAT_GRID["A4"]
     per_page = cols * rows
     kit_pages = math.ceil(len(kit_tile_ids(CFG)) / per_page)
     kit_files = [p for p in tiles if p.name.startswith("booth-kit")]
-    assert len(kit_files) == kit_pages == 4
+    assert len(kit_files) == kit_pages == 5
 
     assert (tmp_path / "board" / f"board_full.{suffix}").exists()
     # 720×500 mat over landscape A4 => a multi-page tiled set.

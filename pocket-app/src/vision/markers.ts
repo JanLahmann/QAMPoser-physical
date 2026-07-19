@@ -101,6 +101,11 @@ function buildMarkerTable(): Map<number, GateSpec> {
     table.set(Number(idStr), { kind: 'gate', gate: axis, label: `${axis} dial`, dialAxis: axis });
   }
 
+  // 45: SWAP tile (×). No native @qamposer/react SWAP type, so two × tiles in
+  // one column are emitted by the circuit builder as a 3-CNOT SWAP between their
+  // rows (see circuitBuilder.emitSwap). IDs 46-49 remain reserved.
+  table.set(45, { kind: 'gate', gate: 'SWAP', label: 'SWAP ×' });
+
   return table;
 }
 

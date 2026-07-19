@@ -30,7 +30,7 @@ SCALE = 3.0  # px per mm → 2160x1500 for the 720x500 mat
 
 # Marker ids (see docs/marker-ids.md): 10-13 H/X/Y/Z, 14 ●, 15 ⊕,
 # 20-23 RX(π/4, π/2, π, -π/2), 24-27 RY, 28-31 RZ, 40 S, 41 T,
-# 42/43/44 RX/RY/RZ dials. A placement is (id, row, col) or (id, row, col, rot)
+# 42/43/44 RX/RY/RZ dials, 45 SWAP ×. A placement is (id, row, col) or (id, row, col, rot)
 # — the optional 4th element is the tile's clockwise 90° turn (0-3), which for a
 # dial selects the angle ROTATION_ANGLES[rot].
 SCENARIOS: dict[str, tuple[str, list[tuple[int, ...]]]] = {
@@ -66,6 +66,10 @@ SCENARIOS: dict[str, tuple[str, list[tuple[int, ...]]]] = {
     "09-dials": (
         "Dial tiles — RX/RY/RZ dials turned to r=0/1/2 → RX(π/4), RY(π/2), RZ(π)",
         [(42, 0, 0, 0), (43, 1, 1, 1), (44, 2, 2, 2)],
+    ),
+    "10-swap": (
+        "SWAP — H on q0 then two × tiles in a column swap q0/q1 (emitted as 3 CNOTs)",
+        [(10, 0, 0), (45, 0, 1), (45, 1, 1)],
     ),
 }
 

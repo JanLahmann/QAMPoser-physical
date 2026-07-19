@@ -18,6 +18,7 @@ import allFamilies from '../../../examples/test-boards/06-all-families.png?url';
 import uniform32 from '../../../examples/test-boards/07-uniform-32.png?url';
 import loneControl from '../../../examples/test-boards/08-lone-control.png?url';
 import dials from '../../../examples/test-boards/09-dials.png?url';
+import swap from '../../../examples/test-boards/10-swap.png?url';
 
 export interface TestBoard {
   /** Stable id (the source filename stem). */
@@ -84,5 +85,11 @@ export const TEST_BOARDS: readonly TestBoard[] = [
     src: dials,
     title: 'Dial tiles',
     blurb: 'RX/RY/RZ dials — the tile’s rotation selects the angle.',
+  },
+  {
+    id: '10-swap',
+    src: swap,
+    title: 'SWAP tiles',
+    blurb: 'Two × tiles in one column swap the qubits — emitted as three CNOTs.',
   },
 ];

@@ -241,6 +241,14 @@
   border-radius: 1px 1px 0 0;
 }
 
+/* Zero-probability stub in the fixed 3-qubit (D=3) axis: present but faded. */
+.bo-h-col.is-dim {
+  opacity: 0.45;
+}
+.bo-h-col.is-dim .bo-h-bar {
+  background: var(--faint);
+}
+
 .bo-h-stack {
   display: flex;
   flex-direction: column;
@@ -359,4 +367,218 @@
   border-color: var(--accent);
   color: #fff;
   font-weight: 600;
+}
+
+/* ---- touch-to-inspect popover (bo- tokens, booth-v2) ------------------ */
+.bo-inspect {
+  position: fixed;
+  transform: translate(-50%, calc(-100% - 1.4vh));
+  max-width: 44vh;
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 1vh 1.6vh;
+  font-size: 1.8vh;
+  line-height: 1.35;
+  color: var(--text);
+  box-shadow: 0 0.6vh 2vh rgba(0, 0, 0, 0.45);
+  z-index: 8;
+  pointer-events: none;
+  animation: bo-inspect-in 0.16s ease-out;
+}
+.bo-inspect.is-below {
+  transform: translate(-50%, 1.4vh);
+}
+@keyframes bo-inspect-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* ---- Quantum Golf: Q-sphere / Bloch views ---------------------------- */
+.bo-qsphere,
+.bo-bloch {
+  display: grid;
+  place-items: center;
+  padding: 0.4rem;
+  position: relative;
+}
+
+/* rewind-arrow reset-orientation button (top-right of the view panel) */
+.bo-qs-reset {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--bg-inset);
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.bo-qs-reset:hover {
+  color: var(--text);
+  border-color: var(--entangle);
+}
+
+/* phase color-wheel legend (bottom-right corner) */
+.bo-qs-legend-wrap {
+  position: absolute;
+  right: 6px;
+  bottom: 4px;
+  z-index: 2;
+  pointer-events: none;
+  opacity: 0.9;
+}
+
+.bo-qs-legend-hub {
+  fill: var(--bg-inset);
+}
+
+.bo-qs-legend-tick {
+  fill: var(--faint);
+  font-size: 7px;
+  font-family: ui-monospace, SFMono-Regular, monospace;
+}
+
+.bo-qs-svg,
+.bo-bl-svg {
+  max-width: 18rem;
+  width: 100%;
+  display: block;
+  margin: 0 auto;
+  touch-action: none;
+}
+
+.bo-qs-sphere,
+.bo-bl-sphere {
+  fill: none;
+  stroke: var(--border);
+  stroke-width: 1;
+}
+
+.bo-qs-disc {
+  fill: var(--faint);
+  fill-opacity: 0.06;
+  stroke: none;
+}
+
+.bo-qs-guide,
+.bo-bl-guide {
+  stroke: var(--border);
+  stroke-width: 0.75;
+  stroke-opacity: 0.6;
+}
+
+.bo-qs-stem {
+  stroke: var(--faint);
+  stroke-width: 1;
+}
+
+.bo-bl-axis {
+  stroke: var(--border);
+  stroke-width: 1;
+}
+
+.bo-bl-arrow {
+  stroke: var(--entangle);
+  stroke-width: 3;
+  stroke-linecap: round;
+}
+
+.bo-bl-ball {
+  fill: var(--entangle);
+}
+
+.bo-bl-target {
+  fill: var(--entangle);
+  stroke: var(--entangle);
+  stroke-width: 1.5;
+  fill-opacity: 0.85;
+}
+
+.bo-bl-ket,
+.bo-bl-qubit {
+  fill: var(--muted);
+  font-size: 12px;
+  font-family: ui-monospace, SFMono-Regular, monospace;
+}
+
+.bo-bl-qubit {
+  fill: var(--faint);
+}
+
+/* ---- Quantum Golf scorecard ------------------------------------------ */
+.bo-golf-hole {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  margin-bottom: 0.55rem;
+}
+
+.bo-golf-name {
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.bo-golf-qubits {
+  font-size: 0.78rem;
+  color: var(--muted);
+}
+
+.bo-golf-ket {
+  font-size: 0.82rem;
+  color: var(--entangle);
+  font-family: ui-monospace, SFMono-Regular, monospace;
+}
+
+.bo-stat b.is-holed {
+  color: var(--ok);
+}
+
+.bo-golf-holed {
+  margin-top: 0.55rem;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--entangle);
+}
+
+.bo-golf-list {
+  display: flex;
+  gap: 0.35rem;
+  margin-top: 0.65rem;
+}
+
+.bo-golf-chip {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.1rem;
+  padding: 0.35rem 0;
+  border-radius: 6px;
+  background: var(--bg-inset);
+  border: 1px solid var(--border);
+  font-size: 0.78rem;
+  color: var(--muted);
+}
+
+.bo-golf-chip.is-current {
+  border-color: var(--entangle);
+  color: var(--text);
+}
+
+.bo-golf-chip.is-done {
+  color: var(--ok);
+}
+
+.bo-golf-chip-best {
+  font-family: ui-monospace, SFMono-Regular, monospace;
+  font-size: 0.76rem;
 }

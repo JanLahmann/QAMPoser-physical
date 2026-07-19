@@ -17,10 +17,10 @@ def test_gate_ids_are_the_kind_gate_entries():
         mid for mid, spec in MARKER_TABLE.items() if spec.kind == "gate"
     )
     assert GATE_IDS == expected
-    # 10-15 (H/X/Y/Z + CNOT halves), 20-31 (rotations), 40/41 (S/T) and
-    # 42/43/44 (RX/RY/RZ dials).
+    # 10-15 (H/X/Y/Z + CNOT halves), 20-31 (rotations), 40/41 (S/T),
+    # 42/43/44 (RX/RY/RZ dials) and 45 (SWAP ×).
     assert set(GATE_IDS) == (
-        set(range(10, 16)) | set(range(20, 32)) | {40, 41, 42, 43, 44}
+        set(range(10, 16)) | set(range(20, 32)) | {40, 41, 42, 43, 44, 45}
     )
 
 
@@ -57,6 +57,24 @@ def test_band_color_matches_gate_color(marker_id):
 )
 def test_single_and_cnot_labels(marker_id, fragment):
     assert fragment in tile_svg(marker_id, CFG)
+
+
+def test_swap_tile_face():
+    # SWAP × prints in the CNOT-family colour with a "SWAP" band caption and a
+    # vector × glyph (two round-capped diagonals), like the CNOT ●/⊕ glyphs.
+    from qamposer_vision.markers import MARKER_TABLE as MT
+
+    spec = MT[45]
+    assert tile_label(spec) == "SWAP"
+    svg = tile_svg(45, CFG)
+    cnot_color = CFG.colors.for_gate("CNOT")
+    assert CFG.colors.for_gate("SWAP") == cnot_color
+    assert cnot_color in svg
+    assert ">SWAP<" in svg
+    # Two diagonal strokes with round caps form the × glyph.
+    assert svg.count('stroke-linecap="round"') >= 2
+    for group in ('id="outline"', 'id="marker"', 'id="symbol"'):
+        assert group in svg
 
 
 def test_s_and_t_tiles_use_z_family_color():

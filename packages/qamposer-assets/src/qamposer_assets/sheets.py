@@ -81,9 +81,9 @@ def _dial_id(axis: str) -> int:
 def kit_tile_ids(cfg: AssetsConfig) -> list[int]:
     """Expand ``[kit]`` quantities into a flat list of marker IDs to print.
 
-    Standard booth kit: H×6, X×6, Y×4, Z×4, S×2, T×2, ●×4, ⊕×4,
+    Standard booth kit: H×6, X×6, Y×4, Z×4, S×2, T×2, ●×4, ⊕×4, ××2 (SWAP),
     ``rotations_each`` of every rotation variant (12 variants), and one RX/RY/RZ
-    dial each — 47 tiles by default.
+    dial each — 49 tiles by default.
     """
     k = cfg.kit
     ids: list[int] = []
@@ -95,6 +95,7 @@ def kit_tile_ids(cfg: AssetsConfig) -> list[int]:
     ids += [_gate_id("T")] * k.T
     ids += [_gate_id("CNOT", "control")] * k.CNOT_control
     ids += [_gate_id("CNOT", "target")] * k.CNOT_target
+    ids += [_gate_id("SWAP")] * k.swap
     for mid in _rotation_ids():
         ids += [mid] * k.rotations_each
     ids += [_dial_id("RX")] * k.rx_dial

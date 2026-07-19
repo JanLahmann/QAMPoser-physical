@@ -25,7 +25,8 @@ import { MessageStrip, type StripMessage } from './MessageStrip';
 import { Celebrations, LOW_POWER_PARTICLES, type CelebrationRequest } from './Celebrations';
 import { ResultsHistogram } from './ResultsHistogram';
 import { QasmPanel } from './QasmPanel';
-import { QSphere2D } from './QSphere2D';
+import { QSphereView } from '@quantum/QSphereView';
+import { BlochView } from '@quantum/BlochView';
 import { Scorecard } from './Scorecard';
 import { DebugPanel } from './DebugPanel';
 import { SettingsControl } from './SettingsDrawer';
@@ -39,9 +40,9 @@ import {
   initialGolfState,
   loadBest,
   saveBest,
-  HOLES,
+  LEVELS,
   type GolfState,
-} from './golf';
+} from '@quantum/golf';
 import { friendlyWarning } from './warnings';
 import {
   detectEnv,
@@ -341,8 +342,8 @@ export function App() {
         if (step.justHoledIn && step.scoreName) {
           saveBest(storage, step.state.best);
           setCelebration({
-            kind: step.hole.k >= 3 ? 'ghz' : 'bell',
-            k: step.hole.k,
+            kind: step.level.qubits >= 3 ? 'ghz' : 'bell',
+            k: step.level.qubits,
             banner: `${step.scoreName}!`,
             token: ++tokenRef.current,
           });
@@ -418,10 +419,10 @@ export function App() {
   const isGolf = settings.mode === 'golf';
   const hasPanel = (p: PanelId) => settings.panels.includes(p);
   const showCamera = hasPanel('camera') || camera.status !== 'idle';
-  const currentHole = HOLES[golfState.holeIndex];
+  const currentLevel = LEVELS[golfState.levelIndex];
   const golfTargets = useMemo(
-    () => new Set<number>([0, (1 << currentHole.k) - 1]),
-    [currentHole.k],
+    () => new Set<number>([0, (1 << currentLevel.qubits) - 1]),
+    [currentLevel.qubits],
   );
 
   const cameraPanel = (
@@ -452,7 +453,16 @@ export function App() {
   const sidebar = isGolf ? (
     <>
       {showCamera && cameraPanel}
-      <QSphere2D key="qsphere" circuit={circuit} targets={golfTargets} />
+      <div key="golfview">
+        <div className="pk-label">{currentLevel.view === 'bloch' ? 'Bloch sphere' : 'Q-sphere'}</div>
+        <div className="pk-well">
+          {currentLevel.view === 'bloch' ? (
+            <BlochView circuit={circuit} classPrefix="pk" />
+          ) : (
+            <QSphereView circuit={circuit} targets={golfTargets} classPrefix="pk" />
+          )}
+        </div>
+      </div>
       <Scorecard key="scorecard" state={golfState} circuit={circuit} />
       {hasPanel('results') && (
         <ResultsHistogram key="results" circuit={circuit} displayQubits={displayed.qubits} />
@@ -477,7 +487,7 @@ export function App() {
           <span className="pk-brand-rest">tangible</span>
           <small>pocket</small>
         </div>
-        {isGolf && <span className="pk-pill pk-pill--mode">golf</span>}
+        {isGolf && <span className="pk-pill pk-pill--mode">Quantum Golf</span>}
         <span className="pk-spacer" />
         <span className={`pk-pill ${camPill.cls}`} aria-label={camPill.label} title={camPill.label}>
           <span className="pk-dot" aria-hidden="true" />

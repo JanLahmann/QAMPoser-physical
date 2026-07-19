@@ -18,6 +18,15 @@ RX_HALF_PI = 21  # RX(pi/2)
 RZ_HALF_PI = 29  # RZ(pi/2)
 S, T = 40, 41    # emitted as RZ(pi/2) / RZ(pi/4)
 RX_DIAL, RY_DIAL, RZ_DIAL = 42, 43, 44
+SWAP = 45        # two × in a column → SWAP, emitted as 3 CNOTs
+
+
+def _gate_tuples(gates: list[dict]) -> list[tuple]:
+    """(id, type, control, target, position) for the CNOTs a SWAP emits."""
+    return [
+        (g["id"], g["type"], g.get("control"), g.get("target"), g["position"])
+        for g in gates
+    ]
 
 
 def _cnot_pairs(gates: list[dict]) -> set[tuple[int, int, int]]:
@@ -182,6 +191,81 @@ def test_extra_control_leaves_one_lone() -> None:
     lone = [w for w in result.warnings if w.kind == "lone_control"]
     assert len(lone) == 1
     assert lone[0].row == 4
+
+
+def test_swap_pair_emits_three_cnots_in_order() -> None:
+    # Two × tiles in column 1 (rows 0 and 1) → SWAP(0,1) as cx(0,1), cx(1,0),
+    # cx(0,1), all at position 1, ids swap-0-1-1/2/3 and in that exact order.
+    result = build_circuit([TilePlacement(SWAP, 0, 1), TilePlacement(SWAP, 1, 1)], QUBITS)
+    assert result.warnings == []
+    assert _gate_tuples(result.circuit["gates"]) == [
+        ("swap-0-1-1", "CNOT", 0, 1, 1),
+        ("swap-0-1-2", "CNOT", 1, 0, 1),
+        ("swap-0-1-3", "CNOT", 0, 1, 1),
+    ]
+
+
+def test_swap_order_survives_gate_sort() -> None:
+    # The 3-CNOT order must hold regardless of tile input order (the builder sorts
+    # gates, and the SWAP triple must not be reshuffled by control row).
+    a = build_circuit([TilePlacement(SWAP, 2, 3), TilePlacement(SWAP, 4, 3)], QUBITS)
+    b = build_circuit([TilePlacement(SWAP, 4, 3), TilePlacement(SWAP, 2, 3)], QUBITS)
+    assert a.circuit == b.circuit
+    ids = [g["id"] for g in a.circuit["gates"]]
+    assert ids == ["swap-2-3-1", "swap-2-3-2", "swap-2-3-3"]
+    ctrls = [g["control"] for g in a.circuit["gates"]]
+    assert ctrls == [2, 4, 2]  # cx(a,b), cx(b,a), cx(a,b), never reordered
+
+
+def test_swap_anchor_is_the_lower_row() -> None:
+    # id prefix uses the lower of the two rows regardless of placement order.
+    (g1, _g2, _g3) = build_circuit(
+        [TilePlacement(SWAP, 3, 0), TilePlacement(SWAP, 1, 0)], QUBITS
+    ).circuit["gates"]
+    assert g1["id"] == "swap-1-0-1"
+    assert (g1["control"], g1["target"]) == (1, 3)
+
+
+def test_swap_pairs_nearest_by_row() -> None:
+    # Rows {0,1,4,5} in one column → nearest pairs (0,1) and (4,5), never crossing.
+    placements = [TilePlacement(SWAP, r, 0) for r in (0, 1, 4, 5)]
+    result = build_circuit(placements, QUBITS)
+    assert result.warnings == []
+    anchors = sorted({g["id"].rsplit("-", 1)[0] for g in result.circuit["gates"]})
+    assert anchors == ["swap-0-0", "swap-4-0"]
+
+
+def test_lone_swap_warns_and_excludes() -> None:
+    # A single × tile has no partner → lone_swap warning, no gate emitted.
+    result = build_circuit([TilePlacement(H, 0, 0), TilePlacement(SWAP, 2, 1)], QUBITS)
+    assert [g["id"] for g in result.circuit["gates"]] == ["h-0-0"]
+    assert len(result.warnings) == 1
+    w = result.warnings[0]
+    assert w.kind == "lone_swap"
+    assert (w.row, w.col) == (2, 1)
+    assert w.marker_ids == (SWAP,)
+
+
+def test_odd_swap_count_pairs_and_warns_leftover() -> None:
+    # Three × in a column → one nearest pair + one lone_swap for the leftover.
+    placements = [TilePlacement(SWAP, r, 0) for r in (0, 1, 4)]
+    result = build_circuit(placements, QUBITS)
+    swap_gates = [g for g in result.circuit["gates"] if g["id"].startswith("swap-")]
+    assert len(swap_gates) == 3  # one SWAP = 3 CNOTs
+    assert {g["id"].rsplit("-", 1)[0] for g in swap_gates} == {"swap-0-0"}
+    lone = [w for w in result.warnings if w.kind == "lone_swap"]
+    assert len(lone) == 1 and lone[0].row == 4
+
+
+def test_two_swaps_in_different_columns() -> None:
+    placements = [
+        TilePlacement(SWAP, 0, 0), TilePlacement(SWAP, 1, 0),
+        TilePlacement(SWAP, 2, 2), TilePlacement(SWAP, 3, 2),
+    ]
+    result = build_circuit(placements, QUBITS)
+    assert result.warnings == []
+    anchors = {g["id"].rsplit("-", 1)[0] for g in result.circuit["gates"]}
+    assert anchors == {"swap-0-0", "swap-2-2"}
 
 
 def test_cell_conflict_excludes_both() -> None:

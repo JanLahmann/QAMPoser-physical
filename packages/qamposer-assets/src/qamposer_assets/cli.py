@@ -4,6 +4,7 @@ Subcommands:
 
 * ``tiles`` — tile cut-sheets (booth kit + one-of-everything) for a paper format.
 * ``board`` — the board mat: full single page **and** the tiled multi-page set.
+* ``cheatsheet`` — the one-page booth-staff quick reference (A4).
 * ``all``   — everything above.
 
 SVG is the source of truth; PDFs are rendered via :mod:`cairosvg` (falling back
@@ -19,6 +20,7 @@ from collections.abc import Iterable
 from pathlib import Path
 
 from .board import board_svg, board_tiled_svgs
+from .cheatsheet import cheatsheet_svgs
 from .config import AssetsConfig, load_config
 from .pdf import BackendUnavailable, available_backend, svg_to_pdf
 from .sheets import kit_sheet_svgs, sample_sheet_svgs, tile_sheet_svgs
@@ -59,7 +61,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "command",
-        choices=("tiles", "board", "all"),
+        choices=("tiles", "board", "cheatsheet", "all"),
         help="what to generate.",
     )
     return parser
@@ -114,6 +116,10 @@ def _do_board(cfg: AssetsConfig, writer: _Writer, fmt: str) -> None:
     writer.emit(board_tiled_svgs(cfg, fmt), "board", f"board_{fmt}_tiled")
 
 
+def _do_cheatsheet(cfg: AssetsConfig, writer: _Writer) -> None:
+    writer.emit(cheatsheet_svgs(cfg), "cheatsheet", "cheatsheet")
+
+
 def generate(
     command: str,
     cfg: AssetsConfig,
@@ -129,6 +135,8 @@ def generate(
         _do_tiles(cfg, writer, fmt)
     if command in ("board", "all"):
         _do_board(cfg, writer, fmt)
+    if command in ("cheatsheet", "all"):
+        _do_cheatsheet(cfg, writer)
     return writer.written
 
 

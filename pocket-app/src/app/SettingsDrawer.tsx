@@ -128,7 +128,7 @@ export function SettingsControl() {
                   value={settings.mode}
                   options={[
                     { value: 'composer', label: 'Composer' },
-                    { value: 'golf', label: 'Golf' },
+                    { value: 'golf', label: 'Quantum Golf' },
                   ]}
                   onChange={(mode) => settingsStore.update({ mode })}
                 />

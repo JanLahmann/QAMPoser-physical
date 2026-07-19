@@ -827,15 +827,131 @@ body,
   padding: 0.5rem;
 }
 
-.pk-qsphere-svg {
-  max-width: 12rem;
+.pk-qsphere-svg,
+.pk-qs-svg,
+.pk-bl-svg {
+  max-width: 13rem;
   display: block;
+  margin: 0 auto;
+  touch-action: none;
 }
 
 .pk-qs-ring {
   fill: none;
   stroke: var(--border);
   stroke-width: 1;
+}
+
+/* ---- Q-sphere / Bloch (3D-projected) --------------------------------- */
+
+.pk-qsphere,
+.pk-bloch {
+  display: grid;
+  place-items: center;
+  position: relative;
+}
+
+/* rewind-arrow reset-orientation button (top-right of the view panel) */
+.pk-qs-reset {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--bg-inset);
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.pk-qs-reset:hover {
+  color: var(--text);
+  border-color: var(--entangle);
+}
+
+/* phase color-wheel legend (bottom-right corner) */
+.pk-qs-legend-wrap {
+  position: absolute;
+  right: 4px;
+  bottom: 2px;
+  z-index: 2;
+  pointer-events: none;
+  opacity: 0.9;
+}
+
+.pk-qs-legend-hub {
+  fill: var(--bg-inset);
+}
+
+.pk-qs-legend-tick {
+  fill: var(--faint);
+  font-size: 7px;
+  font-family: var(--mono);
+}
+
+.pk-qs-sphere,
+.pk-bl-sphere {
+  fill: none;
+  stroke: var(--border);
+  stroke-width: 1;
+}
+
+.pk-qs-disc {
+  fill: var(--faint);
+  fill-opacity: 0.06;
+  stroke: none;
+}
+
+.pk-qs-guide,
+.pk-bl-guide {
+  stroke: var(--border);
+  stroke-width: 0.75;
+  stroke-opacity: 0.6;
+}
+
+.pk-qs-stem {
+  stroke: var(--faint);
+  stroke-width: 1;
+}
+
+.pk-bl-axis {
+  stroke: var(--border);
+  stroke-width: 1;
+}
+
+.pk-bl-arrow {
+  stroke: var(--entangle);
+  stroke-width: 2.5;
+  stroke-linecap: round;
+}
+
+.pk-bl-ball {
+  fill: var(--entangle);
+}
+
+.pk-bl-target {
+  fill: var(--entangle);
+  stroke: var(--entangle);
+  stroke-width: 1.5;
+  fill-opacity: 0.85;
+}
+
+.pk-bl-ket {
+  fill: var(--muted);
+  font-size: 11px;
+  font-family: var(--mono);
+}
+
+.pk-bl-qubit {
+  fill: var(--faint);
+  font-size: 11px;
+  font-family: var(--mono);
 }
 
 /* ---- OpenQASM panel --------------------------------------------------- */
@@ -865,6 +981,11 @@ body,
 .pk-golf-name {
   font-size: 0.95rem;
   font-weight: 600;
+}
+
+.pk-golf-qubits {
+  font-size: 0.72rem;
+  color: var(--muted);
 }
 
 .pk-golf-ket {

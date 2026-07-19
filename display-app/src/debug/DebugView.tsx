@@ -9,7 +9,7 @@
 import { useEffect, useState, type CSSProperties } from 'react';
 import { useEntangibleState } from '../ws/useEntangibleState';
 import { getStateSocket } from '../ws/stateSocket';
-import type { DisplayMode, SidebarSide } from '../ws/messages';
+import type { DisplayMode, SidebarSide, Wires } from '../ws/messages';
 import { markerLabel } from './markerLabels';
 
 function fmt(n: number | null | undefined, digits = 2): string {
@@ -112,6 +112,7 @@ function LayoutCard() {
   const mode = layout?.mode;
   const sidebar = layout?.sidebar;
   const panels = layout?.panels ?? [];
+  const wires = layout?.wires;
 
   // Registry order first, then any live panels not in the registry.
   const knownPanels = [
@@ -122,6 +123,8 @@ function LayoutCard() {
   const setMode = (m: DisplayMode) => socket.sendMessage({ type: 'select_mode', mode: m });
   const setSidebar = (s: SidebarSide) =>
     socket.sendMessage({ type: 'select_layout', sidebar: s });
+  const setWires = (w: Wires) =>
+    socket.sendMessage({ type: 'select_layout', wires: w });
   const togglePanel = (panel: string, show: boolean) => {
     const next = show
       ? [...panels, panel]
@@ -180,6 +183,24 @@ function LayoutCard() {
               onClick={() => setSidebar(s)}
             >
               {s}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div style={{ marginBottom: '0.9rem' }}>
+        <div style={{ color: 'var(--ent-text-dim)', fontSize: '0.8rem', marginBottom: '0.35rem' }}>
+          wires
+        </div>
+        <div style={{ display: 'flex', gap: '0.5rem' }}>
+          {(['compact', 'all'] as Wires[]).map((w) => (
+            <button
+              key={w}
+              type="button"
+              style={pillStyle(wires === w)}
+              onClick={() => setWires(w)}
+            >
+              {w}
             </button>
           ))}
         </div>

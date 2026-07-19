@@ -29,7 +29,9 @@ router = APIRouter()
 
 DEFAULT_MODE = "composer"
 DEFAULT_SIDEBAR = "right"
+DEFAULT_WIRES = "compact"
 VALID_SIDEBARS = ("left", "right")
+VALID_WIRES = ("compact", "all")
 
 #: Per-mode default (preset) panel stacks, in display order (registry names).
 MODE_PANELS: dict[str, list[str]] = {
@@ -49,11 +51,12 @@ def default_panels(mode: str) -> list[str]:
 
 @dataclass
 class LayoutState:
-    """Current display layout: mode + sidebar side + visible panels (ordered)."""
+    """Current display layout: mode + sidebar side + visible panels + wire count."""
 
     mode: str = DEFAULT_MODE
     sidebar: str = DEFAULT_SIDEBAR
     panels: list[str] = field(default_factory=lambda: default_panels(DEFAULT_MODE))
+    wires: str = DEFAULT_WIRES
 
     def to_message(self) -> dict:
         """The ``layout`` server message (camelCase wire JSON is already flat)."""
@@ -62,10 +65,16 @@ class LayoutState:
             "mode": self.mode,
             "sidebar": self.sidebar,
             "panels": list(self.panels),
+            "wires": self.wires,
         }
 
     def to_dict(self) -> dict:
-        return {"mode": self.mode, "sidebar": self.sidebar, "panels": list(self.panels)}
+        return {
+            "mode": self.mode,
+            "sidebar": self.sidebar,
+            "panels": list(self.panels),
+            "wires": self.wires,
+        }
 
 
 def _toml_str(value: str) -> str:
@@ -78,6 +87,7 @@ def _dump_toml(state: LayoutState) -> str:
         f"mode = {_toml_str(state.mode)}\n"
         f"sidebar = {_toml_str(state.sidebar)}\n"
         f"panels = [{panels}]\n"
+        f"wires = {_toml_str(state.wires)}\n"
     )
 
 
@@ -85,6 +95,7 @@ def _state_from_toml(data: dict) -> LayoutState:
     mode = data.get("mode")
     sidebar = data.get("sidebar")
     panels = data.get("panels")
+    wires = data.get("wires")
     state = LayoutState()
     if isinstance(mode, str):
         state.mode = mode
@@ -92,6 +103,8 @@ def _state_from_toml(data: dict) -> LayoutState:
         state.sidebar = sidebar
     if isinstance(panels, list):
         state.panels = [str(p) for p in panels]
+    if isinstance(wires, str) and wires in VALID_WIRES:
+        state.wires = wires
     return state
 
 
@@ -137,11 +150,13 @@ class LayoutStore:
         *,
         sidebar: str | None = None,
         panels: list[str] | None = None,
+        wires: str | None = None,
     ) -> LayoutState:
         """Partial update: ``None`` fields keep their current value.
 
         Unknown panel names pass through untouched (forward-compatible); the
         server never validates the registry — clients ignore names they lack.
+        An unknown ``wires`` value is ignored (state unchanged).
         """
         changed = False
         if sidebar is not None:
@@ -153,6 +168,12 @@ class LayoutStore:
         if panels is not None:
             self._state.panels = [str(p) for p in panels]
             changed = True
+        if wires is not None:
+            if wires in VALID_WIRES:
+                self._state.wires = wires
+                changed = True
+            else:
+                logger.info("ignoring select_layout with unknown wires: %r", wires)
         if changed:
             self._save()
         return self._state

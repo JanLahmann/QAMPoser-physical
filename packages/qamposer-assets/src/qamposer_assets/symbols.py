@@ -14,6 +14,7 @@ from .svgbase import esc, fmt
 __all__ = [
     "control_dot",
     "target_cross",
+    "swap_cross",
     "ket_zero",
     "text",
     "CROSS_STROKE_FRACTION",
@@ -60,6 +61,36 @@ def target_cross(
         f'stroke="{color}" stroke-width="{fmt(stroke)}" stroke-linecap="butt" />'
     )
     return circle + horiz + vert
+
+
+def swap_cross(
+    cx: float,
+    cy: float,
+    radius: float,
+    *,
+    color: str,
+    stroke: float | None = None,
+) -> str:
+    """SWAP glyph ``×``: two thick, round-capped diagonal strokes.
+
+    Drawn as vector shapes (like ``●``/``⊕``) rather than a font glyph so it can
+    never tofu in print. Spans a ``2*radius`` box centred on (cx, cy).
+    ``stroke`` defaults to 18 % of the glyph height (``2 * radius``) — a touch
+    heavier than the target cross so the ``×`` reads clearly at tile scale.
+    """
+    if stroke is None:
+        stroke = 0.18 * (2.0 * radius)
+    diag_a = (
+        f'<line x1="{fmt(cx - radius)}" y1="{fmt(cy - radius)}" '
+        f'x2="{fmt(cx + radius)}" y2="{fmt(cy + radius)}" '
+        f'stroke="{color}" stroke-width="{fmt(stroke)}" stroke-linecap="round" />'
+    )
+    diag_b = (
+        f'<line x1="{fmt(cx - radius)}" y1="{fmt(cy + radius)}" '
+        f'x2="{fmt(cx + radius)}" y2="{fmt(cy - radius)}" '
+        f'stroke="{color}" stroke-width="{fmt(stroke)}" stroke-linecap="round" />'
+    )
+    return diag_a + diag_b
 
 
 def ket_zero(x_left: float, cy: float, cap: float, *, color: str) -> tuple[str, float]:

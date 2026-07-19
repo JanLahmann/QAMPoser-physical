@@ -24,7 +24,7 @@ from qamposer_vision.markers import (
 from .config import AssetsConfig
 from .marker_svg import marker_group
 from .svgbase import esc, fmt, rect, svg_document
-from .symbols import control_dot, target_cross, text
+from .symbols import control_dot, swap_cross, target_cross, text
 
 __all__ = [
     "gate_marker_ids",
@@ -51,11 +51,14 @@ def tile_label(spec: GateSpec) -> str:
     * rotation: gate + thin space + pretty angle (``RX π/2``, ``RY -π/2``)
     * dial: ``RX dial`` / ``RY dial`` / ``RZ dial`` (the angle is set by rotation)
     * CNOT: ``CONTROL`` / ``TARGET`` (the ●/⊕ glyph is drawn separately)
+    * SWAP: ``SWAP`` (the ``×`` glyph is drawn separately)
     """
     if spec.dial_axis is not None:
         return f"{spec.dial_axis} dial"
     if spec.gate == "CNOT":
         return "CONTROL" if spec.role == "control" else "TARGET"
+    if spec.gate == "SWAP":
+        return "SWAP"
     if spec.param_label is not None:
         return f"{spec.gate}{_THIN_SPACE}{spec.param_label}"
     return spec.gate
@@ -154,6 +157,23 @@ def _render_symbol(
             letter_spacing=word_font * 0.06,
         )
         return f'<g id="symbol">{glyph}{caption}</g>'
+
+    if spec.gate == "SWAP":
+        # "SWAP ×": the word on the left, the vector × glyph to its right, so the
+        # band reads left-to-right like the control/target tiles.
+        word = "SWAP"
+        word_font = _fit_font(word, t.size * 0.50, base_font * 0.72)
+        caption = text(
+            t.size * 0.40,
+            band_cy,
+            word,
+            size=word_font,
+            color="#ffffff",
+            family=font_family,
+            letter_spacing=word_font * 0.06,
+        )
+        glyph = swap_cross(t.size * 0.76, band_cy, t.band_height * 0.30, color="#ffffff")
+        return f'<g id="symbol">{caption}{glyph}</g>'
 
     max_w = t.size - 2 * t.frame_width - 3.0
     font = _fit_font(label, max_w, base_font)

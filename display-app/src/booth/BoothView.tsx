@@ -36,6 +36,14 @@ import { MessageStrip, type StripMessage } from './MessageStrip';
 import { Celebrations, type CelebrationRequest } from './Celebrations';
 import { AttractMode } from './AttractMode';
 import { NoisyRun } from './NoisyRun';
+import { TouchInspector } from './TouchInspector';
+import { Scorecard } from './Scorecard';
+import { isTouchEnabled } from './touch';
+import { displayCircuit } from './displayWires';
+import type { Wires } from '../ws/messages';
+import { QSphereView } from '../quantum/QSphereView';
+import { BlochView } from '../quantum/BlochView';
+import { golfStep, initialGolfState, LEVELS, type GolfState } from '../quantum/golf';
 import './booth-v2.css';
 
 const BOARD_QUBITS = 5;
@@ -117,11 +125,18 @@ export function BoothView() {
   const snapshot = useEntangibleState();
   const { circuit, detection, status, connectionState } = snapshot;
   // Layout arrives via an additive message; tolerate its absence.
-  const layout = (snapshot as { layout?: { panels?: string[]; mode?: string } }).layout;
+  const layout = (
+    snapshot as { layout?: { panels?: string[]; mode?: string; wires?: Wires } }
+  ).layout;
   const panels = layout?.panels ?? DEFAULT_PANELS;
   const mode = layout?.mode ?? 'composer';
+  const wires: Wires = layout?.wires ?? 'compact';
 
   const liveCircuit: Circuit = circuit?.circuit ?? createDefaultCircuit(BOARD_QUBITS);
+  // Display-only wire trim: the editor + histogram follow `wires`; every other
+  // consumer (moments, QASM, state) keeps the full five-qubit truth.
+  const displayedCircuit = displayCircuit(liveCircuit, wires);
+  const displayedQubits = displayedCircuit.qubits;
   const warnings = detection?.warnings ?? [];
   const markersPresent = (detection?.markers?.length ?? 0) > 0;
   const conn = connectionInfo(connectionState);
@@ -149,6 +164,22 @@ export function BoothView() {
   const [strip, setStrip] = useState<StripMessage | null>(null);
   const [celebration, setCelebration] = useState<CelebrationRequest | null>(null);
 
+  // --- golf engine (booth mode === 'golf'; best-of-session in memory) ------
+  const [golfState, setGolfState] = useState<GolfState>(() => initialGolfState());
+  const golfStateRef = useRef<GolfState>(golfState);
+  const modeRef = useRef(mode);
+  modeRef.current = mode;
+
+  // --- touch-to-inspect (optional: ?touch=1 or a coarse pointer) -----------
+  const [touch] = useState(() =>
+    isTouchEnabled(
+      typeof window !== 'undefined' ? window.location.search : '',
+      typeof window !== 'undefined' &&
+        typeof window.matchMedia === 'function' &&
+        window.matchMedia('(pointer: coarse)').matches,
+    ),
+  );
+
   // --- attract mode bookkeeping --------------------------------------------
   const lastActivityRef = useRef<number>(Date.now());
   const boardEmptyRef = useRef(true);
@@ -168,6 +199,27 @@ export function BoothView() {
     processedMsgRef.current = circuit;
 
     const next = circuit.circuit;
+
+    if (modeRef.current === 'golf') {
+      // Golf drives its own celebrations (hole-in banner); the composer moment
+      // engine is skipped entirely (as in the pocket app).
+      const step = golfStep(golfStateRef.current, next);
+      golfStateRef.current = step.state;
+      setGolfState(step.state);
+      if (step.justHoledIn && step.scoreName) {
+        setCelebration({
+          kind: step.level.qubits >= 3 ? 'ghz' : 'bell',
+          k: step.level.qubits,
+          banner: `${step.scoreName}!`,
+          token: ++tokenRef.current,
+        });
+      }
+      prevCircuitRef.current = next;
+      lastActivityRef.current = Date.now();
+      setAttract(false);
+      return;
+    }
+
     const result = evaluateMoment(
       prevCircuitRef.current,
       next,
@@ -219,7 +271,7 @@ export function BoothView() {
       case 'results':
         return (
           <div key="results">
-            <Histogram circuit={liveCircuit} />
+            <Histogram circuit={liveCircuit} displayQubits={displayedQubits} />
             <NoisyRun circuit={liveCircuit} onMessage={pushStrip} />
           </div>
         );
@@ -232,8 +284,46 @@ export function BoothView() {
     }
   };
 
+  // --- golf sidebar (mode === 'golf') --------------------------------------
+  // Host golf preset panels are ['scorecard', 'minicircuit', 'results']. The
+  // view (Q-sphere / Bloch) + scorecard are rendered structurally (like pocket),
+  // so they show regardless of the preset; the remaining recognised panels
+  // (e.g. 'results') follow the list. 'scorecard'/'minicircuit'/'qsphere'/
+  // 'bloch' names are absorbed here to avoid duplication.
+  const currentLevel = LEVELS[golfState.levelIndex];
+  const golfTargets = useMemo(
+    () => new Set<number>([0, (1 << currentLevel.qubits) - 1]),
+    [currentLevel.qubits],
+  );
+  const GOLF_STRUCTURAL = new Set(['scorecard', 'minicircuit', 'qsphere', 'bloch']);
+  const golfSidebar = (
+    <>
+      <div key="golfview">
+        <div className="bo-label">{currentLevel.view === 'bloch' ? 'Bloch sphere' : 'Q-sphere'}</div>
+        <div className="bo-well">
+          {currentLevel.view === 'bloch' ? (
+            <BlochView circuit={liveCircuit} classPrefix="bo" />
+          ) : (
+            <QSphereView circuit={liveCircuit} targets={golfTargets} classPrefix="bo" />
+          )}
+        </div>
+      </div>
+      <Scorecard key="scorecard" state={golfState} circuit={liveCircuit} />
+      {panels.filter((name) => !GOLF_STRUCTURAL.has(name)).map(panelFor)}
+    </>
+  );
+
+  // A tap anywhere counts as activity and exits attract instantly (spec: touch
+  // also breaks attract). Only wired when touch is enabled.
+  const onRootPointerDown = touch
+    ? () => {
+        lastActivityRef.current = Date.now();
+        setAttract(false);
+      }
+    : undefined;
+
   return (
-    <div className="bo">
+    <div className="bo" onPointerDown={onRootPointerDown}>
       <header className="bo-topbar">
         <div className="bo-brand">
           <span className="en">En</span>tangible
@@ -266,7 +356,7 @@ export function BoothView() {
       </header>
 
       <ThemeProvider defaultTheme="dark">
-        <QamposerProvider circuit={liveCircuit} config={qamposerConfig}>
+        <QamposerProvider circuit={displayedCircuit} config={qamposerConfig}>
           <main className="bo-main">
             <section className="bo-stage">
               <div className="bo-stage-editor">
@@ -274,7 +364,7 @@ export function BoothView() {
               </div>
               <MessageStrip message={strip} />
             </section>
-            <aside className="bo-side">{panels.map(panelFor)}</aside>
+            <aside className="bo-side">{mode === 'golf' ? golfSidebar : panels.map(panelFor)}</aside>
           </main>
         </QamposerProvider>
       </ThemeProvider>
@@ -291,7 +381,8 @@ export function BoothView() {
       </footer>
 
       <Celebrations celebration={celebration} />
-      {attract && <AttractMode />}
+      {attract && <AttractMode branding={branding} />}
+      <TouchInspector circuit={liveCircuit} enabled={touch} />
     </div>
   );
 }

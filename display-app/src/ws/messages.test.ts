@@ -120,6 +120,7 @@ const layoutSample = {
   mode: 'composer',
   sidebar: 'right',
   panels: ['results'],
+  wires: 'compact',
 } satisfies LayoutMessage;
 
 const selectModeSample = {
@@ -131,6 +132,7 @@ const selectLayoutSample = {
   type: 'select_layout',
   sidebar: 'left',
   panels: ['results'],
+  wires: 'all',
 } satisfies SelectLayout;
 
 const SAMPLES: Record<string, unknown> = {

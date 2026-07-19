@@ -11,11 +11,32 @@
 
 const MINI_CONFETTI = ['#fa4d56', '#002d9c', '#9f1853', '#33b1ff'];
 
-export function AttractMode() {
+/** Event branding shown as the attract-mode co-brand ("Entangible at ⟨event⟩"). */
+export interface AttractBranding {
+  name?: string | null;
+  logoUrl?: string | null;
+}
+
+export function AttractMode({ branding }: { branding?: AttractBranding | null }) {
+  // Co-brand only when an event name is configured (docs/booth-ux.md → branding).
+  const eventName = branding?.name?.trim() || null;
+  const label = eventName
+    ? `Entangible at ${eventName} — place a tile on the table to begin`
+    : 'Entangible — place a tile on the table to begin';
   return (
-    <div className="ent-attract" role="img" aria-label="Entangible — place a tile on the table to begin">
+    <div className="ent-attract" role="img" aria-label={label}>
       <div className="ent-attract__stage">
         <div className="ent-attract__wordmark">Entangible</div>
+        {eventName && (
+          <div className="ent-attract__cobrand">
+            <span className="ent-attract__cobrand-at">at</span>
+            {branding?.logoUrl ? (
+              <img src={branding.logoUrl} alt={eventName} />
+            ) : (
+              <span className="ent-attract__cobrand-name">{eventName}</span>
+            )}
+          </div>
+        )}
 
         <div className="ent-attract__board">
           {/* five drawn qubit wires */}

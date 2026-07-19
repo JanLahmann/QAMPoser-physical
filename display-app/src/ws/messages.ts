@@ -97,6 +97,13 @@ export type DisplayMode = 'composer' | 'golf' | 'attract';
 export type SidebarSide = 'right' | 'left';
 
 /**
+ * How many wires the booth editor + histogram DISPLAY (booth-v2). Purely
+ * cosmetic — the physical table and recognized circuit are always five qubits;
+ * `compact` shows the used rows (floor 3, auto-grows to 4/5), `all` shows 5.
+ */
+export type Wires = 'compact' | 'all';
+
+/**
  * `layout` — panel/mode state (additive, booth-v2).
  *
  * `panels` are registry names in display order (`results`, `state`, `qasm`,
@@ -109,6 +116,7 @@ export interface LayoutMessage {
   mode: DisplayMode;
   sidebar: SidebarSide;
   panels: string[];
+  wires: Wires;
 }
 
 /** Discriminated union of everything the server can push on `/ws/state`. */
@@ -154,6 +162,7 @@ export interface SelectLayout {
   type: 'select_layout';
   sidebar?: SidebarSide;
   panels?: string[];
+  wires?: Wires;
 }
 
 export type ClientMessage = ClientHello | SelectCamera | SelectMode | SelectLayout;

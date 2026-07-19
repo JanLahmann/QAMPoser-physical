@@ -1363,6 +1363,7 @@ source = { editable = "packages/qamposer-assets" }
 dependencies = [
     { name = "cairosvg" },
     { name = "qamposer-vision" },
+    { name = "qrcode" },
 ]
 
 [package.optional-dependencies]
@@ -1379,6 +1380,7 @@ requires-dist = [
     { name = "cairosvg" },
     { name = "pytest", marker = "extra == 'dev'" },
     { name = "qamposer-vision", editable = "packages/qamposer-vision" },
+    { name = "qrcode" },
     { name = "reportlab", marker = "extra == 'fallback'" },
     { name = "svglib", marker = "extra == 'fallback'" },
 ]
