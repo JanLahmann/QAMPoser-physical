@@ -773,6 +773,43 @@
   line-height: 1.15;
 }
 
+/* Sidebar take-home card — "your circuit → Composer" QR. Subtle; distinct from
+   the footer "follow along" visitor QR. Appears only for a settled circuit. */
+.bo-composer-qr {
+  margin-top: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 1vh;
+}
+
+.bo-composer-qr__body {
+  display: flex;
+  align-items: center;
+  gap: 1.4vh;
+}
+
+.bo-composer-qr__code {
+  width: 9vh;
+  height: 9vh;
+  flex: none;
+  background: #fff;
+  border-radius: 6px;
+  padding: 0.6vh;
+  box-sizing: border-box;
+}
+
+.bo-composer-qr__code svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.bo-composer-qr__label {
+  font-size: 1.4vh;
+  line-height: 1.2;
+  color: var(--muted);
+}
+
 /* Attract-screen QR — a touch larger, centered near the site line. */
 .ent-attract__qr {
   display: flex;

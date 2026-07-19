@@ -48,6 +48,7 @@ import { MessageStrip, type StripMessage } from './MessageStrip';
 import { Celebrations, type CelebrationRequest } from './Celebrations';
 import { AttractMode } from './AttractMode';
 import { VisitorQr } from './VisitorQr';
+import { ComposerQrCard } from './ComposerQrCard';
 import { NoisyRun } from './NoisyRun';
 import { TouchInspector } from './TouchInspector';
 import { Scorecard } from './Scorecard';
@@ -369,7 +370,12 @@ export function KioskView() {
               </div>
               <MessageStrip message={strip} />
             </section>
-            <aside className="bo-side">{mode === 'golf' ? golfSidebar : panels.map(panelFor)}</aside>
+            <aside className="bo-side">
+              {mode === 'golf' ? golfSidebar : panels.map(panelFor)}
+              {/* Take-home: scan the live table circuit onto your own phone.
+                  Quiet, and distinct from the footer "follow along" visitor QR. */}
+              <ComposerQrCard circuit={liveCircuit} qasm={circuit?.qasm} />
+            </aside>
           </main>
         </QamposerProvider>
       </ThemeProvider>

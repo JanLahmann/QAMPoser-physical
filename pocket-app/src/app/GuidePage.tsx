@@ -142,6 +142,10 @@ export function GuidePage() {
             . A free IBM Quantum account
             (the Open Plan) then lets you run it on real hardware.
           </p>
+          <p>
+            On another device? The <b>QR</b> button beside Transfer shows a code that opens the
+            same pre-loaded Composer on your phone — scan it and your circuit is there, no typing.
+          </p>
         </section>
 
         {/* 3. Test without a printer */}

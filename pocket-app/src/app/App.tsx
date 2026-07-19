@@ -40,7 +40,7 @@ import { Celebrations, LOW_POWER_PARTICLES, type CelebrationRequest } from './Ce
 import { ResultsHistogram } from './ResultsHistogram';
 import { QasmPanel } from './QasmPanel';
 import { StatePanel } from '@shared/display/StatePanel';
-import { TransferButton } from './TransferButton';
+import { ComposerHandoff } from './ComposerHandoff';
 import { QSphereView } from '@quantum/QSphereView';
 import { BlochView } from '@quantum/BlochView';
 import { Scorecard } from './Scorecard';
@@ -711,14 +711,14 @@ export function App() {
       )}
       {hasPanel('state') && <StatePanel key="state" circuit={circuit} classPrefix="pk" />}
       {hasPanel('qasm') && <QasmPanel key="qasm" circuit={circuit} />}
-      <TransferButton key="transfer" circuit={circuit} onToast={pushStrip} />
+      <ComposerHandoff key="transfer" circuit={circuit} onToast={pushStrip} />
       {settings.debug && <DebugPanel key="debug" frame={lastFrameRef.current} fps={camera.fps} />}
     </>
   ) : (
     <>
       {showCamera && cameraPanel}
       {composerPanels}
-      <TransferButton key="transfer" circuit={circuit} onToast={pushStrip} />
+      <ComposerHandoff key="transfer" circuit={circuit} onToast={pushStrip} />
       {settings.debug && <DebugPanel key="debug" frame={lastFrameRef.current} fps={camera.fps} />}
     </>
   );
