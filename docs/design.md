@@ -364,6 +364,39 @@ deviation from the plan above: the validation fixtures use `qiskit.quantum_info`
 applying the exact documented channel schedule, which carries less alignment
 risk than matching Aer's implicit channel ordering.
 
+### Quantum Mixer — unified Qoffee-Maker/quantum-mixer successor (task #35; PLANNED)
+
+Full plan in [`docs/mixer.md`](mixer.md). Per Jan 2026-07-19: Entangible
+replaces the standalone [Qoffee-Maker](https://qoffee-maker.org) and
+quantum-mixer apps — "order something by programming a quantum computer"
+becomes a **mode of Entangible One** (like `golf`), not a separate stack.
+Start with mixer (display-only serving); machine control follows.
+
+- **Menu packs** (the config package): data-only scenario configs — coffee /
+  ice cream / cocktails / anything — with items, pictures (emoji fallback),
+  theme/branding, optional machine programs. Canonical JSON wire schema in
+  `shared/menu/`; host packs authored as TOML dirs next to `branding.toml`,
+  served via `/api/menu/*`; standalone accepts `?menu=<builtin>` /
+  `?menupack=<url>`. N items ↔ ⌈log₂ N⌉ qubits (≤ 32 items); unfilled codes
+  auto-pad as "Surprise me" (never remapped — the measurement is the
+  measurement).
+- **Serve**: menu view shows per-item live probabilities from the same vector
+  as the histogram (ideal, or noisy when a noise preset is active); one
+  sampled shot picks the item, reveal + order card; noisy shots are the
+  teaching moment ("real hardware might make you an espresso instead").
+- **Booth**: mode `mixer` (panels `menu`/`order`/`results`), additive
+  protocol: `layout.menu`, operator `select_menu` + `serve`, broadcast
+  `served` (viewer phones reveal in sync). Same validation/persistence/
+  policy-test patterns as `select_noise`.
+- **Dispatch** (later phase, Qoffee parity): host-side `dispatch.py` adapters
+  `log`/`webhook`/`homeconnect`, disarmed by default, armed from `/debug`,
+  cooldowns; secrets never in the browser.
+- Phases MX0 (menu core) → MX1 (standalone mixer = quantum-mixer replaced) →
+  MX2 (booth mode) → MX3 (custom packs) → MX4 (dispatch = Qoffee replaced) →
+  MX5 (sunset old repos, upstream track). Open questions incl. a
+  quantum-mixer feature-parity audit (repo not readable from the planning
+  session) are listed in mixer.md.
+
 ### Quantum Golf — DECIDED (per Jan 2026-07-19, build today)
 
 Unifies the former "Bloch Golf" and "Q-sphere Golf" ideas under one name and
