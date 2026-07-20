@@ -23,9 +23,19 @@ import {
   subscribeDeviceChange,
   type CameraDevice,
 } from './cameraDevices';
+import { BUILTIN_PACKS } from '@shared/menu/builtinPacks';
 import { boothLink, useBoothLink } from './boothLink';
 import { cameraRoleLink, useCameraRole } from './cameraRoleLink';
 import { normalizeBoothUrl } from '../sources/boothUrl';
+
+/** One glyph per built-in menu pack for the drawer's Menu picker. */
+const MENU_EMOJI: Record<string, string> = {
+  coffee: '☕',
+  cocktails: '🍸',
+  icecream: '🍨',
+  juice: '🧃',
+  demo: '🍕',
+};
 
 const PANEL_LABELS: Record<PanelId, string> = {
   camera: 'Camera preview',
@@ -315,6 +325,24 @@ export function SettingsControl({
                   onChange={(mode) => settingsStore.update({ mode })}
                 />
               </section>
+
+              {settings.mode === 'quantina' && (
+                <section className="pk-drawer-sec">
+                  <div className="pk-label">Menu</div>
+                  <Segmented<string>
+                    value={settings.menu}
+                    options={BUILTIN_PACKS.map((p) => ({
+                      value: p.id,
+                      label: `${MENU_EMOJI[p.id] ?? '🍽️'} ${p.title}`,
+                    }))}
+                    onChange={(menu) => settingsStore.update({ menu })}
+                  />
+                  <p className="pk-drawer-hint">
+                    What a serve orders. Custom menus arrive via a ?menu= or
+                    ?menupack= link (see the menu-packs guide).
+                  </p>
+                </section>
+              )}
 
               <section className="pk-drawer-sec">
                 <div className="pk-label">Input</div>
