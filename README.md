@@ -63,6 +63,20 @@ warning cases): open one fullscreen on a monitor and point a camera at it —
 the [pocket app](https://entangible.org), a phone in the booth camera role, or
 `uv run qamposer-vision detect --image …`. See the folder README.
 
+## Qiskit integration
+
+- Every detected circuit is exported as **OpenQASM 2**, ready for
+  [Qiskit](https://github.com/Qiskit/qiskit)'s `QuantumCircuit.from_qasm_str`
+  — the table is a physical front-end for the Qiskit toolchain.
+- **Transfer to IBM Composer**: one tap hands the live circuit to the IBM
+  Quantum Composer, as a live-synced browser tab or a QR code visitors scan.
+- The in-browser **noise presets** are calibration snapshots derived from
+  Qiskit fake backends across four IBM chip generations
+  (Falcon → Eagle → Heron → Nighthawk), replayed by a density-matrix simulator.
+- The optional [`qamposer-backend`](https://github.com/QAMP-62) (FastAPI +
+  Qiskit 2.x + Aer) plugs in via `@qamposer/react`'s `qiskitAdapter` for
+  noisy-simulator or real-hardware runs.
+
 ## Part of the Fun with Quantum family
 
 Entangible is part of [**Fun with Quantum**](https://fun-with-quantum.org), a
