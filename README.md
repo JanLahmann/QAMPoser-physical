@@ -12,6 +12,13 @@ generations (Falcon → Eagle → Heron → Nighthawk), so the "why quantum is h
 contrast works offline. Hosts: Raspberry Pi 4/5 and macOS; cameras: USB / Pi
 Camera / Continuity Camera / iPhone browser streaming.
 
+**Quantina** — the built-in successor to
+[Qoffee-Maker](https://github.com/JanLahmann/Qoffee-Maker) and quantum-mixer:
+a menu mode where the circuit's measurement probabilities drive a drinks menu
+(five built-in packs, host-side custom packs, and an optional dispatch layer
+that can drive a Home Connect coffee machine). Try
+[entangible.org/?menu=cocktails](https://entangible.org/?menu=cocktails).
+
 **One app, every role** ("Entangible One"): the same React app is the
 standalone composer at [entangible.org](https://entangible.org) (on-device
 camera + TS detection, no install), the booth big screen (`/?kiosk`), the

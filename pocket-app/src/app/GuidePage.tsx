@@ -158,6 +158,24 @@ export function GuidePage() {
           </p>
         </section>
 
+        {/* 2b. Quantina */}
+        <section className="pk-guide-sec">
+          <Label>Quantina — a quantum cantina</Label>
+          <p>
+            The built-in successor to Qoffee-Maker and quantum-mixer: switch{' '}
+            <b>Settings → Mode → Quantina</b> and the histogram becomes a menu — your circuit's
+            probabilities set the odds, a measurement picks your drink. Try{' '}
+            <a href="/?menu=cocktails">entangible.org/?menu=cocktails</a>: one H per wire makes
+            every cocktail equally likely; entangle two qubits and watch items start winning
+            together.
+          </p>
+          <p className="pk-guide-muted">
+            Five menus ship built-in (coffee, cocktails, ice cream, juice, diner). Booths can add
+            their own menus — and even wire the winning outcome to a real coffee machine — see the
+            repository docs.
+          </p>
+        </section>
+
         {/* 3. Test without a printer */}
         <section className="pk-guide-sec">
           <Label>Test without a printer</Label>

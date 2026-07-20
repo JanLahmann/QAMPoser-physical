@@ -364,7 +364,7 @@ deviation from the plan above: the validation fixtures use `qiskit.quantum_info`
 applying the exact documented channel schedule, which carries less alignment
 risk than matching Aer's implicit channel ordering.
 
-### Quantina — unified Qoffee-Maker/quantum-mixer successor (task #35; PLANNED)
+### Quantina — unified Qoffee-Maker/quantum-mixer successor (task #35; IMPLEMENTED 2026-07-20 — as-built status and commit hashes in [`docs/quantina.md`](quantina.md))
 
 Full plan in [`docs/quantina.md`](quantina.md). Per Jan 2026-07-19: Entangible
 replaces the standalone [Qoffee-Maker](https://qoffee-maker.org) and
