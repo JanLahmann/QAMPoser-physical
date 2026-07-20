@@ -27,6 +27,7 @@ surfaces stay fully open (no token, zero friction).
 | `/ws/frames` (phone frame intake)                    | `?key=<token>` (else close `4403`) |
 | `GET /debug/stream`, `GET /debug/snapshot.jpg` (MJPEG preview) | `?key=` or `X-Operator-Key` header (else `403`) |
 | `GET /api/qr`                                        | `?key=` or `X-Operator-Key` header (else `403`) |
+| `/api/dispatch/*` (QN4 — dispatch state, arm/disarm, Home Connect setup) | `?key=` or `X-Operator-Key` header (else `403`); the OAuth callback is instead guarded by its single-use `state` param |
 | `GET /api/visitor-qr` (view-only pocket QR)          | **open** — embeds no token    |
 | `/`, `/pocket`, `/api/info`, the `/debug` page shell | **open**                      |
 
