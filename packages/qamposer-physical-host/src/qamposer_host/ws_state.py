@@ -201,9 +201,19 @@ async def _handle_serve(websocket: WebSocket, msg: dict) -> None:
         logger.info("ignoring serve with invalid shotSource: %r", shot_source)
         return
 
-    await websocket.app.state.hub.publish_served(
+    message = await websocket.app.state.hub.publish_served(
         pack_id=pack_id, outcomes=list(outcomes), shot_source=shot_source
     )
+
+    # QN4 machine dispatch: hand the stamped serve to the dispatcher (disarmed by
+    # default → usually a no-op). A dispatch failure must NEVER break the serve
+    # broadcast, so it is fully guarded here.
+    dispatcher = getattr(websocket.app.state, "dispatcher", None)
+    if dispatcher is not None:
+        try:
+            await dispatcher.on_served(message)
+        except Exception:  # pragma: no cover - defensive
+            logger.warning("dispatch on_served failed", exc_info=True)
 
 
 async def _handle_select_layout(websocket: WebSocket, msg: dict) -> None:

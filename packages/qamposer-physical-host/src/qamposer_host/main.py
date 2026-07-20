@@ -19,9 +19,10 @@ import logging
 import httpx
 from fastapi import FastAPI
 
-from . import branding, layout, menu, preview, proxy, static, ws_frames, ws_state
+from . import branding, dispatch, layout, menu, preview, proxy, static, ws_frames, ws_state
 from .branding import load_branding
 from .config import HostConfig, build_frame_source, camera_from_spec, ensure_push_source
+from .dispatch import Dispatcher, load_dispatch_config
 from .hub import Hub
 from .layout import LayoutStore
 from .proxy import BackendHealth
@@ -65,6 +66,14 @@ def create_app(
     app.state.layout_store = LayoutStore(config.resolved_layout_file)
     app.state.branding = load_branding(config.resolved_branding_file)
 
+    # QN4 machine dispatch: config loaded once at startup (missing/invalid
+    # dispatch.toml → disarmed log adapter). Armed state is in-memory only.
+    app.state.dispatcher = Dispatcher(
+        load_dispatch_config(config.config_dir / "dispatch.toml"),
+        config.config_dir,
+        client_getter=lambda: app.state.http_client,
+    )
+
     hub.set_camera(camera_from_spec(config.source, connected=False))
     hub.set_backend(enabled=config.backend_mode != "off", healthy=False)
     hub.set_layout(app.state.layout_store.message())  # seed late-joiner replay
@@ -78,6 +87,7 @@ def create_app(
     app.include_router(layout.router)
     app.include_router(branding.router)
     app.include_router(menu.router)
+    app.include_router(dispatch.router)
     app.include_router(static.router)
 
     return app

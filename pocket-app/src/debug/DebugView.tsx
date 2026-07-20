@@ -484,6 +484,214 @@ function QuantinaCard() {
   );
 }
 
+interface DispatchLogEntry {
+  ts: number;
+  packId: string | null;
+  outcome: string | null;
+  adapter: string;
+  ok: boolean;
+  reason: string | null;
+}
+
+interface DispatchStatus {
+  adapter: string;
+  armed: boolean;
+  armedUntil: number | null;
+  cooldownUntil: number | null;
+  appliance: { haId: string; name: string } | null;
+  hasToken: boolean;
+  log: DispatchLogEntry[];
+}
+
+interface HcAppliance {
+  id: string;
+  name: string | null;
+  type: string | null;
+}
+
+/**
+ * "Dispatch" card (operator surface, QN4): the machine-dispatch controls that
+ * replace Qoffee-Maker (docs/dispatch.md). Reflects GET `/api/dispatch` and
+ * drives the arm/disarm + Home Connect setup endpoints (all operator-gated via
+ * `withKey`). ARMING IS PER SESSION AND IN-MEMORY on the host — a restart comes
+ * up disarmed. Refreshes after every action (plus a manual refresh button);
+ * kept deliberately simple (no polling).
+ */
+function DispatchCard() {
+  const [status, setStatus] = useState<DispatchStatus | null>(null);
+  const [tick, setTick] = useState(0);
+  const [appliances, setAppliances] = useState<HcAppliance[] | null>(null);
+
+  const refresh = () => setTick((n) => n + 1);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch(withKey('/api/dispatch'))
+      .then((r) => (r.ok ? r.json() : null))
+      .then((s: DispatchStatus | null) => {
+        if (!cancelled) setStatus(s);
+      })
+      .catch(() => {
+        if (!cancelled) setStatus(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [tick]);
+
+  const post = (path: string, body?: unknown) =>
+    fetch(withKey(path), {
+      method: 'POST',
+      ...(body ? { headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) } : {}),
+    })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((s: DispatchStatus | null) => {
+        if (s) setStatus(s);
+        else refresh();
+      })
+      .catch(refresh);
+
+  const listAppliances = () =>
+    fetch(withKey('/api/dispatch/homeconnect/appliances'))
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data: { appliances?: HcAppliance[] } | null) =>
+        setAppliances(data?.appliances ?? []),
+      )
+      .catch(() => setAppliances([]));
+
+  const selectAppliance = (a: HcAppliance) =>
+    post('/api/dispatch/homeconnect/select', { haId: a.id, name: a.name ?? a.id });
+
+  const pillStyle = (active: boolean): CSSProperties => ({
+    padding: '0.3rem 0.8rem',
+    borderRadius: 999,
+    border: '1px solid var(--ent-border, #333)',
+    background: active ? 'var(--ent-accent, #0f62fe)' : 'transparent',
+    color: active ? '#fff' : 'var(--ent-text, #e6e6ea)',
+    cursor: 'pointer',
+    fontSize: '0.85rem',
+  });
+
+  const armedMins =
+    status?.armedUntil != null
+      ? Math.max(0, Math.round((status.armedUntil - Date.now() / 1000) / 60))
+      : null;
+  const coolingSecs =
+    status?.cooldownUntil != null
+      ? Math.max(0, Math.round(status.cooldownUntil - Date.now() / 1000))
+      : null;
+  const isHomeConnect = status?.adapter === 'homeconnect';
+
+  return (
+    <section className="debug__section">
+      <h2>dispatch</h2>
+      {!status && (
+        <div className="debug__muted" style={{ marginBottom: '0.75rem' }}>
+          waiting for /api/dispatch…
+        </div>
+      )}
+
+      {status && (
+        <>
+          <table className="debug__kv" style={{ marginBottom: '0.75rem' }}>
+            <tbody>
+              <tr>
+                <td>adapter</td>
+                <td>{status.adapter}</td>
+              </tr>
+              <tr>
+                <td>armed</td>
+                <td>
+                  {status.armed
+                    ? `yes${armedMins != null ? ` · ~${armedMins} min left` : ''}`
+                    : 'no (serve does nothing)'}
+                </td>
+              </tr>
+              <tr>
+                <td>cooldown</td>
+                <td>{coolingSecs != null ? `${coolingSecs}s` : '—'}</td>
+              </tr>
+              {isHomeConnect && (
+                <>
+                  <tr>
+                    <td>token</td>
+                    <td>{status.hasToken ? 'connected' : 'not connected'}</td>
+                  </tr>
+                  <tr>
+                    <td>machine</td>
+                    <td>{status.appliance ? `${status.appliance.name} (${status.appliance.haId})` : '—'}</td>
+                  </tr>
+                </>
+              )}
+            </tbody>
+          </table>
+
+          <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginBottom: '0.75rem' }}>
+            <button type="button" style={pillStyle(status.armed)} onClick={() => post('/api/dispatch/arm')}>
+              Arm
+            </button>
+            <button type="button" style={pillStyle(false)} onClick={() => post('/api/dispatch/disarm')}>
+              Disarm
+            </button>
+            <button type="button" style={pillStyle(false)} onClick={refresh}>
+              Refresh
+            </button>
+          </div>
+
+          {isHomeConnect && (
+            <div style={{ marginBottom: '0.5rem' }}>
+              <div style={{ color: 'var(--ent-text-dim)', fontSize: '0.8rem', marginBottom: '0.35rem' }}>
+                home connect
+              </div>
+              <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'center' }}>
+                <a href={withKey('/api/dispatch/homeconnect/login')} style={{ ...pillStyle(false), textDecoration: 'none' }}>
+                  {status.hasToken ? 'Reconnect Home Connect' : 'Connect Home Connect'}
+                </a>
+                {status.hasToken && (
+                  <button type="button" style={pillStyle(false)} onClick={listAppliances}>
+                    List appliances
+                  </button>
+                )}
+              </div>
+              {appliances != null && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem', marginTop: '0.5rem' }}>
+                  {appliances.length === 0 && <span className="debug__muted">no appliances</span>}
+                  {appliances.map((a) => (
+                    <div key={a.id} style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                      <button
+                        type="button"
+                        style={pillStyle(status.appliance?.haId === a.id)}
+                        onClick={() => selectAppliance(a)}
+                      >
+                        select
+                      </button>
+                      <span style={{ fontFamily: 'var(--ent-mono)' }}>
+                        {a.name ?? a.id} · {a.type ?? '?'}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          <div style={{ color: 'var(--ent-text-dim)', fontSize: '0.8rem', margin: '0.5rem 0 0.35rem' }}>
+            recent dispatches
+          </div>
+          <div style={{ fontFamily: 'var(--ent-mono)', fontSize: '0.75rem' }}>
+            {status.log.length === 0 && <span className="debug__muted">none yet</span>}
+            {status.log.slice(0, 8).map((e, i) => (
+              <div key={i} style={{ color: e.ok ? 'var(--ent-text)' : 'var(--ent-text-dim)' }}>
+                {e.packId ?? '?'}/{e.outcome ?? '?'} → {e.adapter} {e.ok ? '✓' : `✗ ${e.reason ?? ''}`}
+              </div>
+            ))}
+          </div>
+        </>
+      )}
+    </section>
+  );
+}
+
 /**
  * Operator-key prompt shown on a keyless `/debug` visit. The staff QR opens
  * `/debug?key=…` (auto-stored, no prompt); typing the token here stores it and
@@ -644,6 +852,8 @@ export function DebugView() {
         <LayoutCard />
 
         <QuantinaCard />
+
+        <DispatchCard />
 
         {/* Volatile, per-frame lists live at the bottom (min-height reserved)
             so their constant resizing never shifts the stable cards above. */}

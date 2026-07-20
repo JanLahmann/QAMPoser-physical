@@ -220,13 +220,16 @@ class Hub:
 
     async def publish_served(
         self, *, pack_id: str, outcomes: list[str], shot_source: str
-    ) -> None:
+    ) -> dict:
         """Stamp + broadcast a Quantina ``served`` message to every client.
 
         The host is the authority: it assigns the monotonic serve ``seq`` (per
         host process, independent of the circuit ``seq``) and the active
         ``packId``, then fans the serve out so every screen reveals the same
         result in sync. The latest ``served`` is replayed to late joiners.
+
+        Returns the stamped message dict so the caller can hand it to the machine
+        dispatcher (QN4) after the broadcast.
         """
         self._serve_seq += 1
         message = {
@@ -238,6 +241,7 @@ class Hub:
         }
         self._latest_served = message
         await self._broadcast(message)
+        return message
 
     # -- thread bridge -----------------------------------------------------
 
