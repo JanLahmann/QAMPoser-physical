@@ -16,6 +16,9 @@ import {
   type SelectMode,
   type SelectLayout,
   type SelectNoise,
+  type SelectMenu,
+  type Serve,
+  type ServedMessage,
 } from './messages';
 
 // This suite runs under the pocket app (SC1 rule: shared tests run once there);
@@ -131,7 +134,16 @@ const layoutSample = {
   panels: ['results'],
   wires: 'compact',
   noise: 'off',
+  menu: null,
 } satisfies LayoutMessage;
+
+const servedSample = {
+  type: 'served',
+  seq: 0,
+  packId: '',
+  outcomes: [''],
+  shotSource: 'ideal',
+} satisfies ServedMessage;
 
 const selectModeSample = {
   type: 'select_mode',
@@ -150,6 +162,17 @@ const selectNoiseSample = {
   preset: 'heron',
 } satisfies SelectNoise;
 
+const selectMenuSample = {
+  type: 'select_menu',
+  pack: 'cocktails',
+} satisfies SelectMenu;
+
+const serveSample = {
+  type: 'serve',
+  outcomes: [''],
+  shotSource: 'ideal',
+} satisfies Serve;
+
 const SAMPLES: Record<string, unknown> = {
   circuit: circuitSample,
   detection: detectionSample,
@@ -161,6 +184,9 @@ const SAMPLES: Record<string, unknown> = {
   select_mode: selectModeSample,
   select_layout: selectLayoutSample,
   select_noise: selectNoiseSample,
+  select_menu: selectMenuSample,
+  serve: serveSample,
+  served: servedSample,
 };
 
 /**

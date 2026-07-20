@@ -90,8 +90,8 @@ export interface StatusMessage {
   clients: number;
 }
 
-/** Booth display mode (booth-v2). Golf is hidden until implemented. */
-export type DisplayMode = 'composer' | 'golf' | 'attract';
+/** Booth display mode (booth-v2; `quantina` added with QN2). */
+export type DisplayMode = 'composer' | 'golf' | 'quantina' | 'attract';
 
 /** Which side the sidebar docks on (booth-v2). */
 export type SidebarSide = 'right' | 'left';
@@ -134,6 +134,38 @@ export interface LayoutMessage {
   panels: string[];
   wires: Wires;
   noise: NoisePreset;
+  /**
+   * Active Quantina menu-pack id, or `null` when none is chosen (additive,
+   * QN2). In quantina mode clients fall back to the built-in `coffee` pack
+   * when `null` or when the id resolves to no bundled/loaded pack.
+   */
+  menu: string | null;
+}
+
+/**
+ * Where a Quantina serve's sample came from (additive, QN2): the in-browser
+ * ideal distribution, the noisy distribution (a noise preset was active), or
+ * `real` — a staff-entered bitstring measured on a visitor's own device via
+ * the real-hardware serve loop (docs/quantina.md, decision 5).
+ */
+export type ShotSource = 'ideal' | 'noisy' | 'real';
+
+/**
+ * `served` — a Quantina serve, broadcast to every client (additive, QN2).
+ * The host is the authority: it stamps `seq` and `packId` (the active
+ * `layout.menu`) and fans out, so kiosk and viewer phones reveal the same
+ * result in sync. Clients resolve `outcomes` → items via `shared/menu/`.
+ * The latest `served` is replayed to late joiners after `layout`.
+ */
+export interface ServedMessage {
+  type: 'served';
+  /** Host-stamped serve counter, monotonic per host process. */
+  seq: number;
+  /** The menu pack that was active when served. */
+  packId: string;
+  /** 1 bitstring for single/subset, k for shots mode (leftmost char = q0). */
+  outcomes: string[];
+  shotSource: ShotSource;
 }
 
 /**
@@ -153,6 +185,7 @@ export type ServerMessage =
   | DetectionMessage
   | StatusMessage
   | LayoutMessage
+  | ServedMessage
   | HelloAck;
 
 // ---------------------------------------------------------------------------
@@ -214,12 +247,40 @@ export interface SelectNoise {
   preset: NoisePreset;
 }
 
+/**
+ * `select_menu` — activate a Quantina menu pack (additive, QN2). Operator-only
+ * (silently ignored from viewers). The host validates the id's FORMAT only
+ * (lowercase `[a-z0-9-]`) — it cannot know which packs a client bundles —
+ * persists `layout.menu`, and broadcasts the new layout.
+ */
+export interface SelectMenu {
+  type: 'select_menu';
+  pack: string;
+}
+
+/**
+ * `serve` — perform a Quantina serve (additive, QN2). Sent by the serving
+ * surface (a provisioned kiosk's touch button or the `/debug` serve card);
+ * the sampler runs where the simulation runs (the client), the host stamps
+ * `seq`/`packId` and fans out a `served`. Operator-only; ignored when
+ * `layout.menu` is null. `outcomes`: 1..20 bitstrings (1-5 chars of 0/1;
+ * more than one only in shots mode).
+ */
+export interface Serve {
+  type: 'serve';
+  outcomes: string[];
+  /** Default `ideal` when omitted. */
+  shotSource?: ShotSource;
+}
+
 export type ClientMessage =
   | ClientHello
   | SelectCamera
   | SelectMode
   | SelectLayout
-  | SelectNoise;
+  | SelectNoise
+  | SelectMenu
+  | Serve;
 
 // ---------------------------------------------------------------------------
 // Type-string tables (consumed by the parity test)
@@ -231,6 +292,7 @@ export const SERVER_MESSAGE_TYPES = [
   'detection',
   'status',
   'layout',
+  'served',
   'hello_ack',
 ] as const;
 
@@ -241,6 +303,8 @@ export const CLIENT_MESSAGE_TYPES = [
   'select_mode',
   'select_layout',
   'select_noise',
+  'select_menu',
+  'serve',
 ] as const;
 
 /** Union of all documented `type` discriminators (server + client). */
