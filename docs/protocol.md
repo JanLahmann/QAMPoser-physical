@@ -23,7 +23,7 @@ surfaces stay fully open (no token, zero friction).
 | Surface                                              | Gate                          |
 |------------------------------------------------------|-------------------------------|
 | `/ws/state` reads (circuit/detection/status/layout)  | **open** — any client         |
-| `/ws/state` `select_camera` / `select_mode` / `select_layout` / `select_noise` | operator `hello` (below) |
+| `/ws/state` `select_camera` / `select_mode` / `select_layout` / `select_noise` / `select_menu` / `serve` | operator `hello` (below) |
 | `/ws/frames` (phone frame intake)                    | `?key=<token>` (else close `4403`) |
 | `GET /debug/stream`, `GET /debug/snapshot.jpg` (MJPEG preview) | `?key=` or `X-Operator-Key` header (else `403`) |
 | `GET /api/qr`                                        | `?key=` or `X-Operator-Key` header (else `403`) |
@@ -94,6 +94,27 @@ Every message is a JSON object with a `type` discriminator.
 }
 ```
 
+### `served` — a Quantina serve, broadcast to every client (additive)
+
+```jsonc
+{
+  "type": "served",
+  "seq": 7,                   // host-stamped serve counter, monotonic per process
+  "packId": "cocktails",      // the menu pack that was active when served
+  "outcomes": ["101"],        // 1 bitstring for single/subset, k for shots mode
+  "shotSource": "ideal"       // "ideal" | "noisy" | "real" — where the sample came from
+}
+```
+
+- The host is the authority: it stamps `seq` and `packId` (the current
+  `layout.menu`) and fans the serve out to ALL clients, so every screen —
+  kiosk and viewer phones alike — reveals the same result in sync.
+- `shotSource: "real"` marks a staff-entered bitstring measured on a visitor's
+  own device/account (the real-hardware serve loop, docs/quantina.md).
+- Clients resolve `outcomes` → items via the shared menu-pack mapping
+  (`shared/menu/`). The **latest** `served` is replayed to late joiners after
+  `layout`.
+
 ### `hello_ack` — server's reply to `hello` (additive)
 
 ```jsonc
@@ -128,8 +149,8 @@ not send the `select_*` control messages.
   carrying the resulting standing.
 - `select_camera` swaps the pipeline's frame source at runtime; the server
   answers with a fresh `status`. **Operator-only** — a viewer's `select_camera`
-  / `select_mode` / `select_layout` / `select_noise` is silently ignored (no
-  error, no `status`).
+  / `select_mode` / `select_layout` / `select_noise` / `select_menu` / `serve`
+  is silently ignored (no error, no `status`).
 - Unknown/malformed client messages are logged and ignored — never fatal.
 
 ### `layout` — panel/mode state (additive, booth-v2)
@@ -137,18 +158,22 @@ not send the `select_*` control messages.
 ```jsonc
 {
   "type": "layout",
-  "mode": "composer",                    // "composer" | "golf" | "attract"
+  "mode": "composer",                    // "composer" | "golf" | "quantina" | "attract"
   "sidebar": "right",                    // "right" | "left"
   "panels": ["results", "state", "qasm"], // visible panels, in order (registry names)
   "wires": "compact",                    // "compact" | "all" — displayed wire count
-  "noise": "off"                         // "off"|"falcon"|"eagle"|"heron"|"nighthawk" — booth noise preset
+  "noise": "off",                        // "off"|"falcon"|"eagle"|"heron"|"nighthawk" — booth noise preset
+  "menu": null                           // active Quantina menu-pack id, or null (string | null)
 }
 ```
 
 Broadcast on change; latest replayed to new clients after `status`. Panel
 registry (booth-v2): `results`, `state`, `qasm`, `qsphere` (post-upstream),
-`scorecard` + `minicircuit` (golf), `branding`. Unknown names are ignored by
-clients (forward-compatible).
+`scorecard` + `minicircuit` (golf), `menu` + `order` (quantina), `branding`.
+Unknown names are ignored by clients (forward-compatible). `mode` gained
+`quantina` with QN2; clients on older bundles ignore it (unknown mode → their
+default rendering). In quantina mode a `menu` of `null` means "pack not chosen
+yet" — clients fall back to the built-in `coffee` pack.
 
 ### Client → server (additive, booth-v2)
 
@@ -169,7 +194,27 @@ clients (forward-compatible).
 // to layout.toml, and triggers a layout broadcast (also in late-joiner replay).
 ```
 
-Both persist to `layout.toml` and trigger a `layout` broadcast. REST siblings:
+```jsonc
+{ "type": "select_menu", "pack": "cocktails" }
+// pack: the menu-pack id to activate (lowercase [a-z0-9-]). Operator-only
+// (silently ignored from viewers). The host validates FORMAT only — it cannot
+// know which packs a client bundles — persists layout.menu to layout.toml and
+// broadcasts the new layout; clients falling on an unknown id use `coffee`.
+```
+
+```jsonc
+{ "type": "serve", "outcomes": ["101"], "shotSource": "ideal" }
+// A Quantina serve, sent by the serving surface (a provisioned kiosk's touch
+// button or the /debug serve card) — the sampler runs where the simulation
+// runs (the client); the host is the authority that stamps and fans out.
+// Operator-only. outcomes: 1..20 bitstrings (1-5 chars of 0/1 each; >1 only
+// in shots mode); shotSource: "ideal" | "noisy" | "real" (default "ideal").
+// Ignored when layout.menu is null (no active pack → nothing to serve).
+// The host replies by broadcasting `served` (above) to every client.
+```
+
+`select_mode` / `select_layout` / `select_menu` persist to `layout.toml` and
+trigger a `layout` broadcast. REST siblings:
 `GET /api/layout` (current layout JSON), `GET /api/branding`
 (`{name, logoUrl|null, qrTarget}` from `branding.toml`, defaults when absent).
 
@@ -204,7 +249,8 @@ header carrying the encoded target (for the `/debug` card + tests).
 ## Reconnect rules (client)
 
 - Exponential backoff 0.5 s → 8 s, jittered, forever.
-- On (re)connect the server replays latest `circuit` + `detection` + `status`.
+- On (re)connect the server replays latest `circuit` + `detection` + `status`
+  (+ `layout`, + the latest `served` when one exists).
 - If a replayed `seq` is *lower* than the last seen, the host restarted:
   accept it and reset the local counter (never discard as stale).
 
