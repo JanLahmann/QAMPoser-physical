@@ -600,6 +600,21 @@
   overflow: hidden;
 }
 
+/* Sidebar docked left (layout.sidebar === 'left'): mirror the columns + order. */
+.bo-main.bo-side-left {
+  grid-template-columns: 21.5% 1fr;
+}
+
+.bo-main.bo-side-left .bo-stage {
+  order: 2;
+}
+
+.bo-main.bo-side-left .bo-side {
+  order: 1;
+  border-left: none;
+  border-right: 1px solid var(--border);
+}
+
 .bo-label {
   font-size: 1.4vh;
   font-weight: 600;

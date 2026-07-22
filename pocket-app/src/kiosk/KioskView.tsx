@@ -37,7 +37,7 @@ import { getKioskSocket, kioskStanding, useKioskState } from './kioskSocket';
 import { sendServe } from './serve';
 import { friendlyWarning } from '@shared/display/warnings';
 import type { ConnectionState } from '@shared/ws/stateSocket';
-import type { CircuitMessage, NoisePreset, ShotSource, Wires } from '@shared/ws/messages';
+import type { CircuitMessage, NoisePreset, ShotSource, SidebarSide, Wires } from '@shared/ws/messages';
 import { MenuGrid } from '@shared/menu/MenuGrid';
 import { OrderCard } from '@shared/menu/OrderCard';
 import { ServeReveal } from '@shared/menu/ServeReveal';
@@ -135,6 +135,7 @@ export function KioskView() {
       layout?: {
         panels?: string[];
         mode?: string;
+        sidebar?: SidebarSide;
         wires?: Wires;
         noise?: NoisePreset;
         menu?: string | null;
@@ -143,6 +144,9 @@ export function KioskView() {
   ).layout;
   const panels = layout?.panels ?? DEFAULT_PANELS;
   const mode = layout?.mode ?? 'composer';
+  // Which side the sidebar docks on (booth-v2). Kiosk-only — the standalone
+  // viewer app keeps its own personal `settings.side` (visitor-phone ergonomics).
+  const sidebar: SidebarSide = layout?.sidebar ?? 'right';
   const wires: Wires = layout?.wires ?? 'compact';
   // Noise preset precedence: the booth broadcast (layout.noise) wins; before any
   // layout arrives (or an older host that omits it) fall back to the `?noise=`
@@ -459,6 +463,10 @@ export function KioskView() {
       }
     : undefined;
 
+  // Attract overlay: the host `attract` mode shows it immediately (a staff choice,
+  // not idle-driven); leaving that mode returns to the idle-timer behavior.
+  const showAttract = mode === 'attract' || attract;
+
   if (!everConnected) return <ConnectPending state={connectionState} />;
 
   return (
@@ -496,7 +504,7 @@ export function KioskView() {
 
       <ThemeProvider defaultTheme="dark">
         <QamposerProvider circuit={displayedCircuit} config={qamposerConfig}>
-          <main className="bo-main">
+          <main className={`bo-main ${sidebar === 'left' ? 'bo-side-left' : ''}`}>
             <section className="bo-stage">
               <div className="bo-stage-editor">
                 <CircuitEditor />
@@ -532,7 +540,7 @@ export function KioskView() {
       </footer>
 
       <Celebrations celebration={celebration} />
-      {attract && <AttractMode branding={branding} />}
+      {showAttract && <AttractMode branding={branding} />}
       <TouchInspector circuit={liveCircuit} enabled={touch} />
     </div>
   );

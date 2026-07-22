@@ -74,10 +74,12 @@ function Toggle({
   label,
   checked,
   onChange,
+  disabled = false,
 }: {
   label: string;
   checked: boolean;
   onChange: (v: boolean) => void;
+  disabled?: boolean;
 }) {
   return (
     <button
@@ -85,6 +87,7 @@ function Toggle({
       className={`pk-toggle ${checked ? 'is-on' : ''}`}
       role="switch"
       aria-checked={checked}
+      disabled={disabled}
       onClick={() => onChange(!checked)}
     >
       <span className="pk-toggle-label">{label}</span>
@@ -267,6 +270,9 @@ export function SettingsControl({
   cameraRoleAvailable?: boolean;
 } = {}) {
   const settings = useSettings();
+  // Connected as a booth viewer → the booth drives the panel set (an overlay on
+  // the local settings), so the PANELS section is shown read-only.
+  const connected = useBoothLink().url !== null;
   const [open, setOpen] = useState(false);
 
   const close = useCallback(() => setOpen(false), []);
@@ -366,9 +372,11 @@ export function SettingsControl({
                     key={p}
                     label={PANEL_LABELS[p]}
                     checked={settings.panels.includes(p)}
+                    disabled={connected}
                     onChange={() => settingsStore.togglePanel(p)}
                   />
                 ))}
+                {connected && <p className="pk-drawer-hint">Controlled by booth.</p>}
               </section>
 
               <section className="pk-drawer-sec">

@@ -46,6 +46,14 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
+describe('/debug Layout card modes', () => {
+  it('offers a quantina mode pill that sends select_mode', () => {
+    render(<DebugView />);
+    fireEvent.click(screen.getByRole('button', { name: 'quantina' }));
+    expect(sendMessage).toHaveBeenCalledWith({ type: 'select_mode', mode: 'quantina' });
+  });
+});
+
 describe('/debug Quantina card', () => {
   it('pack picker sends select_menu', () => {
     render(<DebugView />);

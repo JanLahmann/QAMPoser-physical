@@ -47,6 +47,12 @@ export interface StateUpdate {
   readonly boothMode?: BoothMode;
   /** Host-driven wire count; when present it overrides the local setting. */
   readonly boothWires?: Wires;
+  /**
+   * Host-driven panel set in display order (registry names), or `null` when the
+   * layout carries none. Present ⟺ a `layout` message has arrived; while
+   * connected it overrides the local `settings.panels` (an overlay, not a write).
+   */
+  readonly boothPanels?: string[] | null;
   /** Host-driven noise preset; when present it overrides the local setting. */
   readonly boothNoise?: NoisePreset;
   /**

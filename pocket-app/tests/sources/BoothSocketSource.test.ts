@@ -85,6 +85,7 @@ describe('snapshotToUpdate (pure mapping)', () => {
     expect(update.warnings).toEqual([{ code: 'lone_control', col: 2, message: 'lonely' }]);
     expect(update.boothMode).toBe('golf');
     expect(update.boothWires).toBe('all');
+    expect(update.boothPanels).toEqual(['results']);
     expect(update.boothNoise).toBe('heron');
     expect(update.connection).toBe('open');
   });
@@ -96,17 +97,21 @@ describe('snapshotToUpdate (pure mapping)', () => {
     expect(update.qasm).toBeUndefined();
     expect(update.warnings).toEqual([]);
     expect(update.boothMode).toBeUndefined();
+    expect(update.boothPanels).toBeUndefined();
     expect(update.boothNoise).toBeUndefined();
     expect(update.connection).toBe('connecting');
   });
 
-  it('collapses booth mode "attract" to composer (pocket has no attract)', () => {
+  it('collapses booth mode "attract" to composer (viewer app has no attract) but forwards panels', () => {
     const snap = {
       connectionState: 'open',
       lastSeq: null,
       layout: { type: 'layout', mode: 'attract', sidebar: 'right', panels: [], wires: 'compact' },
     } as unknown as StateSnapshot;
-    expect(snapshotToUpdate(snap, fallback).boothMode).toBe('composer');
+    const update = snapshotToUpdate(snap, fallback);
+    expect(update.boothMode).toBe('composer');
+    // panels come through verbatim (an empty attract set here).
+    expect(update.boothPanels).toEqual([]);
   });
 });
 

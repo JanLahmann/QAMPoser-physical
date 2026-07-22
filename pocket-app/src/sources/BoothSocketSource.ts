@@ -11,7 +11,8 @@
  * Mapping (see @shared/ws/messages): the latest `circuit` message → circuit +
  * qasm; `detection.warnings` → the shared `friendlyWarning` envelope; the
  * `layout` message → boothMode (`golf`/`quantina` | else composer) + boothWires +
- * boothNoise + boothMenu (QN2); the latest `served` broadcast → boothServed (the
+ * boothPanels + boothNoise + boothMenu (QN2); the latest `served` broadcast →
+ * boothServed (the
  * viewer's synced reveal); the socket's connection state → a coarse phase.
  */
 import type { Circuit } from '@qamposer/react';
@@ -74,6 +75,7 @@ export function snapshotToUpdate(
     warnings: (snap.detection?.warnings ?? []).map(detectionWarningToInput),
     boothMode,
     boothWires: layout?.wires,
+    boothPanels: layout ? layout.panels : undefined,
     boothNoise: layout?.noise,
     // QN2: surface the active pack id (present ⟺ a layout arrived) and the
     // latest served broadcast so a viewer phone reveals the booth's order.

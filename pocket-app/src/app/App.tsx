@@ -129,6 +129,20 @@ export function stageClassName(manual: boolean): string {
 }
 
 /**
+ * Effective panel set: while connected the booth's broadcast `panels` (registry
+ * names, display order) override the local `settings.panels`; standalone (or
+ * before a layout arrives, `boothPanels` null) the local set stands. Booth
+ * control is an OVERLAY — the local settings are never written, so a disconnect
+ * (boothPanels → null) restores them. Pure + exported so the seam is unit-testable.
+ */
+export function boothOrLocalPanels(
+  boothPanels: readonly string[] | null,
+  localPanels: readonly PanelId[],
+): readonly string[] {
+  return boothPanels ?? localPanels;
+}
+
+/**
  * Vertical auto-fit for the recognized-circuit editor. Measures the stage's
  * available height (ResizeObserver on the editor container) and derives a scale
  * from the editor's natural height (D wires x row height + chrome) so all
@@ -359,6 +373,9 @@ export function App() {
   const [conn, setConn] = useState<ConnectionPhase | null>(null);
   const [boothMode, setBoothMode] = useState<BoothMode | null>(null);
   const [boothWires, setBoothWires] = useState<Wires | null>(null);
+  // Booth-driven panel set (registry names, display order); null while
+  // standalone. When connected it overrides the local `settings.panels`.
+  const [boothPanels, setBoothPanels] = useState<string[] | null>(null);
   const [boothNoise, setBoothNoise] = useState<NoisePreset | null>(null);
   // Booth-driven Quantina pack id + the latest booth serve (QN2). Both null
   // while standalone; when connected they drive the synced menu + reveal.
@@ -427,6 +444,7 @@ export function App() {
         if (update.connection) setConn(update.connection);
         setBoothMode(update.boothMode ?? null);
         setBoothWires(update.boothWires ?? null);
+        setBoothPanels(update.boothPanels ?? null);
         setBoothNoise(update.boothNoise ?? null);
         setBoothMenu(update.boothMenu ?? null);
         if (update.boothServed) setBoothServed(update.boothServed);
@@ -622,6 +640,7 @@ export function App() {
     setConn(null);
     setBoothMode(null);
     setBoothWires(null);
+    setBoothPanels(null);
     setBoothNoise(null);
     setBoothMenu(null);
     setBoothServed(null);
@@ -771,6 +790,9 @@ export function App() {
   const effectiveMode: Mode = boothMode ?? settings.mode;
   const effectiveWires: Wires = boothWires ?? settings.wires;
   const effectiveNoise: NoisePreset = boothNoise ?? settings.noise;
+  // Panels follow the same overlay rule: the booth's set wins while connected,
+  // the local settings stand otherwise (see `boothOrLocalPanels`).
+  const effectivePanels = boothOrLocalPanels(boothPanels, settings.panels);
 
   // Display-only wire count: the recognized `circuit` is always 5 qubits, but
   // the editor draws `effectiveWires` wires (compact auto-grows 3→5). Panels,
@@ -822,7 +844,7 @@ export function App() {
           shotSource: boothServed.shotSource,
         }
       : null;
-  const hasPanel = (p: PanelId) => settings.panels.includes(p);
+  const hasPanel = (p: PanelId) => effectivePanels.includes(p);
   // Viewer policy (design: read-only Display role): while connected to a booth
   // — or building on screen in manual mode — the camera UI is hidden entirely.
   const showCamera = !cameraHidden && (hasPanel('camera') || camera.status !== 'idle');
@@ -872,7 +894,7 @@ export function App() {
     />
   );
 
-  const composerPanels = settings.panels
+  const composerPanels = effectivePanels
     .filter((p) => p !== 'camera')
     .map((p) => {
       switch (p) {

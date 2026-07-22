@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, cleanup, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, cleanup, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import type { Circuit } from '@qamposer/react';
 
 // Mock the operator socket + the key gate so the full DebugView renders. `withKey`
@@ -93,6 +93,43 @@ describe('/debug Dispatch card', () => {
       expect(armCall![0] as string).toContain('key=test-key');
       expect((armCall![1] as RequestInit).method).toBe('POST');
     });
+  });
+
+  // Count GET/POSTs to the dispatch status endpoint (not the homeconnect ones).
+  const dispatchCalls = (fetchMock: ReturnType<typeof stubFetch>) =>
+    fetchMock.mock.calls.filter(
+      ([u]) => (u as string).startsWith('/api/dispatch') && !(u as string).includes('/homeconnect'),
+    ).length;
+
+  it('refetches when a served broadcast arrives on the socket', async () => {
+    const fetchMock = stubFetch(baseDispatch);
+    const { rerender } = render(<DebugView />);
+    await screen.findByText('log');
+    const before = dispatchCalls(fetchMock);
+    // A serve lands on the operator socket → the card refetches (a serve may
+    // have dispatched a machine).
+    dbgSnap = {
+      ...debugSnapshot(),
+      served: { type: 'served', seq: 7, packId: 'coffee', outcomes: ['010'], shotSource: 'ideal' },
+    };
+    rerender(<DebugView />);
+    await waitFor(() => expect(dispatchCalls(fetchMock)).toBeGreaterThan(before));
+  });
+
+  it('polls the dispatch status on a 15 s interval while mounted', () => {
+    vi.useFakeTimers();
+    try {
+      const fetchMock = stubFetch(baseDispatch);
+      render(<DebugView />);
+      const before = dispatchCalls(fetchMock);
+      expect(before).toBeGreaterThanOrEqual(1); // the mount fetch
+      act(() => {
+        vi.advanceTimersByTime(15_000);
+      });
+      expect(dispatchCalls(fetchMock)).toBeGreaterThan(before);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('shows Home Connect controls only when the adapter is homeconnect', async () => {

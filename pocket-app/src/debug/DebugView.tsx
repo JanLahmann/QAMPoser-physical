@@ -105,7 +105,7 @@ function PhoneCameraCard() {
   );
 }
 
-const DISPLAY_MODES: DisplayMode[] = ['composer', 'golf', 'attract'];
+const DISPLAY_MODES: DisplayMode[] = ['composer', 'golf', 'quantina', 'attract'];
 
 /** Booth-wide noise-model presets (one per IBM chip generation, plus off). */
 const NOISE_PRESETS: NoisePreset[] = ['off', 'falcon', 'eagle', 'heron', 'nighthawk'];
@@ -197,7 +197,7 @@ function LayoutCard() {
 
       <div style={{ marginBottom: '0.9rem' }}>
         <div style={{ color: 'var(--ent-text-dim)', fontSize: '0.8rem', marginBottom: '0.35rem' }}>
-          sidebar
+          kiosk sidebar
         </div>
         <div style={{ display: 'flex', gap: '0.5rem' }}>
           {(['left', 'right'] as SidebarSide[]).map((s) => (
@@ -514,15 +514,30 @@ interface HcAppliance {
  * replace Qoffee-Maker (docs/dispatch.md). Reflects GET `/api/dispatch` and
  * drives the arm/disarm + Home Connect setup endpoints (all operator-gated via
  * `withKey`). ARMING IS PER SESSION AND IN-MEMORY on the host — a restart comes
- * up disarmed. Refreshes after every action (plus a manual refresh button);
- * kept deliberately simple (no polling).
+ * up disarmed. Refreshes after every action, on each `served` broadcast (a serve
+ * is the event that may have dispatched), and on a modest 15 s poll while
+ * visible; the manual Refresh button stays.
  */
+const DISPATCH_POLL_MS = 15_000;
+
 function DispatchCard() {
+  const { served } = useDebugState();
   const [status, setStatus] = useState<DispatchStatus | null>(null);
   const [tick, setTick] = useState(0);
   const [appliances, setAppliances] = useState<HcAppliance[] | null>(null);
 
   const refresh = () => setTick((n) => n + 1);
+
+  // A serve may have triggered a dispatch — refetch when a new one arrives.
+  useEffect(() => {
+    if (served) refresh();
+  }, [served?.seq]);
+
+  // Modest poll while the card is mounted (armed/cooldown windows tick down).
+  useEffect(() => {
+    const id = window.setInterval(refresh, DISPATCH_POLL_MS);
+    return () => window.clearInterval(id);
+  }, []);
 
   useEffect(() => {
     let cancelled = false;

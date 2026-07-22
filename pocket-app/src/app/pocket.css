@@ -1203,6 +1203,11 @@ body,
   -webkit-tap-highlight-color: transparent;
 }
 
+.pk-toggle:disabled {
+  cursor: default;
+  opacity: 0.5;
+}
+
 .pk-toggle-label {
   text-align: left;
 }

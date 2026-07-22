@@ -224,7 +224,9 @@ troubleshooting). Developers: repo docs.
 
 ## Attract mode
 
-- Enter: board empty AND no circuit change for 90 s.
+- Enter: board empty AND no circuit change for 90 s, OR staff selecting the
+  `attract` display mode on /debug (the overlay engages immediately; leaving the
+  mode returns to the idle-timer behavior).
 - Content: full-screen slow loop (~12 s): Entangible wordmark; ghost H tile
   slides onto a drawn board → gate appears on a mini circuit; ghost ● ⊕ pair →
   mini confetti; text 48 px: "Build a quantum circuit with your hands —
